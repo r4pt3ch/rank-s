@@ -6,7 +6,8 @@
     "build": "nuxt build",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "seed": "node server/seed.mjs"
+    "seed": "node server/seed.mjs",
+    "migrate:names": "node server/migrate-names.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
