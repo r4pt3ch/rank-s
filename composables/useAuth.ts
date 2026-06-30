@@ -20,9 +20,10 @@ export const useAuth = () => {
   }
 
   async function logout() {
+    const wasMember = user.value?.role === "member";
     await $fetch("/api/auth/logout", { method: "POST" });
     user.value = null;
-    await navigateTo("/login");
+    await navigateTo(wasMember ? "/member-login" : "/login");
   }
 
   return { user, fetchSession, login, memberLogin, logout };

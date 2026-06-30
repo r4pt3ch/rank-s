@@ -1,5 +1,5 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (to.path === "/login" || to.path === "/kiosk" || to.path === "/lobby") return;
+  if (to.path === "/login" || to.path === "/kiosk" || to.path === "/lobby" || to.path === "/member-login") return;
 
   const { user, fetchSession } = useAuth();
   if (!user.value) {
@@ -10,7 +10,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
   }
   if (!user.value) {
-    return navigateTo("/login");
+    return navigateTo(to.path.startsWith("/profile") ? "/member-login" : "/login");
   }
 
   const role = user.value.role;

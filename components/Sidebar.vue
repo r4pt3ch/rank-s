@@ -64,7 +64,8 @@ const roleLabel = computed(() => ({ superadmin: "Super admin", admin: "Regular a
     </div>
     <div style="border-top: 1px solid #1f242c; padding-top: 14px; margin-top: 14px;">
       <a href="/lobby" target="_blank" style="display: block; font-size: 11.5px; color: #5bb8f5; text-decoration: none; margin-bottom: 6px;">Open lobby display ↗</a>
-      <a href="/kiosk" target="_blank" style="display: block; font-size: 11.5px; color: #5bb8f5; text-decoration: none; margin-bottom: 12px;">Open self-check-in kiosk ↗</a>
+      <a href="/kiosk" target="_blank" style="display: block; font-size: 11.5px; color: #5bb8f5; text-decoration: none; margin-bottom: 6px;">Open self-check-in kiosk ↗</a>
+      <a href="/member-login" target="_blank" style="display: block; font-size: 11.5px; color: #5bb8f5; text-decoration: none; margin-bottom: 12px;">Open member account login ↗</a>
     </div>
     <div style="border-top: 1px solid #1f242c; padding-top: 14px; margin-top: 0;">
       <div style="font-size: 13px; font-weight: 600;">{{ user?.name }}</div>
