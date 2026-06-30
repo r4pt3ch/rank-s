@@ -1,0 +1,102 @@
+Create a "Rank S" system with these features:
+
+1. Create User accounts: Super Admin, Regular Admin, Gym Members
+
+2. Super Admin: Functions
+	a. Audit Trail
+	b. Login Logs
+	c. Create, ID for Gym Members with (QR Code, Bar Code, PIN)
+	d. Can also Modify, Reset the Information of the Gym Members
+
+3. Regular Admin Functions
+	a. Create Gym Members Account
+	b. Can also Modify, Reset the Information of the Gym Members
+	c. Can View, Monitor how many came in for the day
+	d. Can issue temporary receipt for Walk-in and Gym Members every time they came in
+	e. Create, ID for Gym Members with (QR Code, Bar Code, PIN)
+	f. Can also Modify, Reset the Information of the Gym Members
+
+4. Gym Members
+	a. Can accumulate points every time they came to gym
+	b. there is a Level Up System for the points accumulated
+	d. Can enter their personal information
+
+4. Login Monitoring for whose coming inside the Gym using Walk-in, Gym Members
+
+5. There is a Level Up System every time a Gym Member went for Gym
+	a. Levels are F, E, D, C, B, A, S, SS, SSS (F lowest and SSS highest level)
+	b. Settings for the threshold for the points for every level up
+
+6. POS for the products or merchandise sold inside the gym with inventory stocks.
+
+7. Can view to a separate monitor or page who came in the gym with their Rank Level.
+
+
+---
+
+Reports Daily, Weekly, Monthly
+
+
+Inventory Sales
+Gym Goers (Walk-in and Members)
+
+-------
+
+Add Features and Settings 
+
+1. for fee or price for every walk-in
+2. Membership for Gym Members 
+	a. Student
+	b. Regular
+	c. Senior Citizen
+
+3. Different Membership Rate for different type of members
+	a. Monthly
+	b. 6 Monthly
+	c. Yearly
+	d. Lifetime
+
+4. Different Fee for the members every time they go to the gym
+
+5. Will notify the admin and member if the membership is expired
+
+6. If the membership is expired and does not want to renew, the profile will stay but charged as walk-in
+
+7. Admins can add, modify, delete the duration of the membership without pay
+
+8. Every time a member and walk-in go to the gym there will be a automatic inventory sales for them
+
+9. Separate Kiosk Login for Members and Walk-in
+
+10. Make a new and separate Lobby Monitor highlighting the last checked in
+
+-------
+
+Membership Plans
+1. When Adding a Plan, make the category editable
+
+Kiosk Problem
+1. Gym Member has the same PIN, make it that it wont conflict with another
+
+Member Creation 
+1. Break down the name into First and Last
+
+Lobby 
+1. Dont Display the Full Name
+
+
+
+
+-------
+
+
+----------------------------------------
+
+MongoDB
+
+User: r4pt3ch_db_user
+Pass: jKRyaPoyHdQQL361
+
+mongodb+srv://r4pt3ch_db_user:jKRyaPoyHdQQL361@rank00.3ru69bv.mongodb.net/?appName=rank00
+
+JWT_SECRET:fd6d8b2117013c8cb63c213d80530d427b0b04d8ed2a20960baaa1184e38ffb1
