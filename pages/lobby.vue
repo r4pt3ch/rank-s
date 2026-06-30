@@ -19,11 +19,14 @@ function initials(name) {
 
 <template>
   <div style="min-height: 100vh; background: #0a0b0d; color: #eceef2; font-family: 'Inter', system-ui, sans-serif; padding: 40px;">
-    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 36px;">
-      <img src="/logo.png" alt="Rank S logo" style="width: 48px; height: 48px; object-fit: contain;" />
+    <div style="display: flex; align-items: center; gap: 22px; margin-bottom: 36px;">
+      <div style="position: relative; width: 92px; height: 92px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(47,143,214,0.5), rgba(47,143,214,0) 70%); filter: blur(3px);"></div>
+        <img src="/logo.png" alt="Rank S logo" style="position: relative; width: 82px; height: 82px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(47,143,214,0.6));" />
+      </div>
       <div>
-        <div style="font-weight: 800; font-size: 22px; letter-spacing: 0.5px;">RANK S — LOBBY</div>
-        <div style="font-size: 13px; color: #7a818c;">Live check-in board</div>
+        <div style="font-weight: 800; font-size: 30px; letter-spacing: 0.8px;">RANK S — LOBBY</div>
+        <div style="font-size: 14px; color: #7a818c; margin-top: 2px;">Live check-in board</div>
       </div>
     </div>
 
