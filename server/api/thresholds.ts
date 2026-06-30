@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (method === "PUT") {
-    const user = await requireRole(event, ["superadmin"]);
+    const user = await requireRole(event, ["superadmin", "admin"]);
     const body = await readBody(event);
     let doc = await Threshold.findOne({ key: "default" });
     if (!doc) doc = await Threshold.create({ key: "default" });

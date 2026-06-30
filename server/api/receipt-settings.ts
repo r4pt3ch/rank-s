@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (method === "PUT") {
-    const user = await requireRole(event, ["superadmin"]);
+    const user = await requireRole(event, ["superadmin", "admin"]);
     const body = await readBody(event);
     let doc = await ReceiptSettings.findOne({ key: "default" });
     if (!doc) doc = await ReceiptSettings.create({ key: "default" });
