@@ -1,0 +1,27 @@
+name: rank-s
+region: sgp
+services:
+  - name: web
+    github:
+      repo: YOUR_GITHUB_USERNAME/rank-s-nuxt
+      branch: main
+      deploy_on_push: true
+    build_command: npm install && npm run build
+    run_command: node .output/server/index.mjs
+    environment_slug: node-js
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    http_port: 8080
+    envs:
+      - key: MONGODB_URI
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: JWT_SECRET
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: NITRO_PORT
+        scope: RUN_AND_BUILD_TIME
+        value: "8080"
+      - key: NITRO_HOST
+        scope: RUN_AND_BUILD_TIME
+        value: "0.0.0.0"
