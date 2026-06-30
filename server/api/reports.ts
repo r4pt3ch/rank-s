@@ -3,9 +3,23 @@ import Receipt from "../utils/models/Receipt";
 import { connectDB } from "../utils/db";
 import { requireRole } from "../utils/auth";
 
-function getRange(period: string) {
+function getRange(period: string, customStart?: string, customEnd?: string) {
   const now = new Date();
   const start = new Date(now);
+
+  if (period === "custom") {
+    const s = customStart ? new Date(customStart) : new Date(0);
+    const e = customEnd ? new Date(customEnd) : now;
+    s.setHours(0, 0, 0, 0);
+    e.setHours(23, 59, 59, 999);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) {
+      throw createError({ statusCode: 400, statusMessage: "Invalid custom date range." });
+    }
+    if (s > e) {
+      throw createError({ statusCode: 400, statusMessage: "Start date must be before end date." });
+    }
+    return { start: s, end: e };
+  }
 
   if (period === "alltime") {
     return { start: new Date(0), end: now };
@@ -31,8 +45,8 @@ export default defineEventHandler(async (event) => {
   await requireRole(event, ["superadmin", "admin"]);
 
   const query = getQuery(event);
-  const period = ["daily", "weekly", "monthly", "alltime"].includes(String(query.period)) ? String(query.period) : "daily";
-  const { start, end } = getRange(period);
+  const period = ["daily", "weekly", "monthly", "alltime", "custom"].includes(String(query.period)) ? String(query.period) : "daily";
+  const { start, end } = getRange(period, query.start as string | undefined, query.end as string | undefined);
 
   const [checkins, receipts] = await Promise.all([
     CheckIn.find({ createdAt: { $gte: start, $lte: end } }).lean(),

@@ -1,7 +1,11 @@
 <script setup>
 const view = ref("goers"); // 'goers' | 'inventory' | 'membership'
 const period = ref("daily");
-const { data, pending } = await useFetch("/api/reports", { query: { period } });
+const customStart = ref("");
+const customEnd = ref("");
+const { data, pending, error: fetchError } = await useFetch("/api/reports", {
+  query: { period, start: customStart, end: customEnd },
+});
 
 const views = [
   { id: "goers", label: "Gym goers" },
@@ -13,16 +17,33 @@ const periods = [
   { id: "weekly", label: "Weekly" },
   { id: "monthly", label: "Monthly" },
   { id: "alltime", label: "All time" },
+  { id: "custom", label: "Custom range" },
 ];
+
+function selectPeriod(id) {
+  period.value = id;
+  if (id === "custom" && !customStart.value) {
+    const today = new Date().toISOString().slice(0, 10);
+    customStart.value = today;
+    customEnd.value = today;
+  }
+}
 
 const rangeLabel = computed(() => {
   if (!data.value) return "";
   if (period.value === "alltime") return "All time";
+  if (period.value === "custom") return `${customStart.value || "?"} – ${customEnd.value || "?"}`;
   const start = new Date(data.value.range.start);
   const end = new Date(data.value.range.end);
   if (period.value === "daily") return start.toLocaleDateString();
   return `${start.toLocaleDateString()} – ${end.toLocaleDateString()}`;
 });
+
+
+function periodSlug() {
+  if (period.value === "custom") return `${customStart.value || "start"}_to_${customEnd.value || "end"}`;
+  return period.value;
+}
 
 function downloadCSV(filename, rows) {
   const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -52,7 +73,7 @@ function exportGoers() {
     ["Date", "Member visits", "Walk-ins", "Total"],
     ...g.byDay.map((d) => [d.date, d.member, d.walkin, d.total]),
   ];
-  downloadCSV(`rank-s-gym-goers-${period.value}.csv`, rows);
+  downloadCSV(`rank-s-gym-goers-${periodSlug()}.csv`, rows);
 }
 
 function exportInventory() {
@@ -72,7 +93,7 @@ function exportInventory() {
     ["Product", "Qty sold", "Revenue"],
     ...inv.byProduct.map((p) => [p.name, p.qty, p.revenue]),
   ];
-  downloadCSV(`rank-s-inventory-sales-${period.value}.csv`, rows);
+  downloadCSV(`rank-s-inventory-sales-${periodSlug()}.csv`, rows);
 }
 
 function exportMembership() {
@@ -91,7 +112,7 @@ function exportMembership() {
     ["Plan", "Count", "Revenue"],
     ...m.byPlan.map((p) => [p.name, p.count, p.revenue]),
   ];
-  downloadCSV(`rank-s-membership-sales-${period.value}.csv`, rows);
+  downloadCSV(`rank-s-membership-sales-${periodSlug()}.csv`, rows);
 }
 
 function exportCurrent() {
@@ -118,20 +139,28 @@ function exportCurrent() {
       </button>
     </div>
 
-    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 22px; flex-wrap: wrap;">
+    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 14px; flex-wrap: wrap;">
       <button
         v-for="p in periods"
         :key="p.id"
         class="rs-btn-secondary"
         style="padding: 7px 13px; font-size: 12px;"
         :style="{ background: period === p.id ? '#1c2128' : 'transparent', color: period === p.id ? '#5bb8f5' : '#aab0bb', borderColor: period === p.id ? '#2f8fd6' : '#2a2f38' }"
-        @click="period = p.id"
+        @click="selectPeriod(p.id)"
       >
         {{ p.label }}
       </button>
-      <span style="font-size: 12px; color: #7a8190; margin-left: 8px;">{{ rangeLabel }}</span>
+      <span v-if="period !== 'custom'" style="font-size: 12px; color: #7a8190; margin-left: 8px;">{{ rangeLabel }}</span>
       <div style="flex: 1;"></div>
       <button class="rs-btn-secondary" @click="exportCurrent">Export CSV</button>
+    </div>
+
+    <div v-if="period === 'custom'" style="display: flex; gap: 10px; align-items: center; margin-bottom: 22px;">
+      <label style="font-size: 12px; color: #9aa1ab;">From</label>
+      <input v-model="customStart" type="date" class="rs-input" style="width: 160px;" />
+      <label style="font-size: 12px; color: #9aa1ab;">To</label>
+      <input v-model="customEnd" type="date" class="rs-input" style="width: 160px;" />
+      <span v-if="fetchError" style="font-size: 12px; color: #e88;">{{ fetchError.data?.statusMessage || "Invalid date range." }}</span>
     </div>
 
     <div v-if="pending" style="font-size: 13px; color: #5d6470; padding: 24px 0; text-align: center;">Loading report...</div>
