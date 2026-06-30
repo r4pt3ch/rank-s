@@ -54,13 +54,10 @@ function backspace() {
 
 <template>
   <div style="min-height: 100vh; background: radial-gradient(circle at 30% 20%, #1a1d23, #0a0b0d); display: flex; align-items: center; justify-content: center; font-family: 'Inter', system-ui, sans-serif; color: #eceef2; padding: 24px;">
-    <div style="width: 420px;">
-      <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 28px;">
-        <div style="position: relative; width: 156px; height: 156px; margin-bottom: 16px; display: flex; align-items: center; justify-content: center;">
-          <div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(47,143,214,0.5), rgba(47,143,214,0) 70%); filter: blur(3px);"></div>
-          <img src="/logo.png" alt="Rank S logo" style="position: relative; width: 140px; height: 140px; object-fit: contain; filter: drop-shadow(0 8px 22px rgba(47,143,214,0.6));" />
-        </div>
-        <div style="font-weight: 800; font-size: 28px; letter-spacing: 1px;">RANK S</div>
+    <div style="width: 480px;">
+      <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 8px;">
+        <img src="/logo.png" alt="Rank S logo" style="width: 280px; height: 280px; object-fit: contain;" />
+        <div style="font-weight: 800; font-size: 28px; letter-spacing: 1px; margin-top: -12px;">RANK S</div>
         <div style="font-size: 13px; color: #7a818c; margin-top: 2px;">Self check-in kiosk</div>
       </div>
 

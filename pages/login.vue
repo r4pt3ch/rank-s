@@ -31,13 +31,10 @@ async function submitMember() {
 
 <template>
   <div style="min-height: 100vh; background: radial-gradient(circle at 30% 20%, #1a1d23, #0a0b0d); display: flex; align-items: center; justify-content: center;">
-    <div style="width: 400px; background: #13161b; border: 1px solid #232730; border-radius: 18px; padding: 40px 32px 32px;">
-      <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 28px;">
-        <div style="position: relative; width: 116px; height: 116px; margin-bottom: 14px; display: flex; align-items: center; justify-content: center;">
-          <div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(47,143,214,0.45), rgba(47,143,214,0) 70%); filter: blur(2px);"></div>
-          <img src="/logo.png" alt="Rank S logo" style="position: relative; width: 104px; height: 104px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(47,143,214,0.55));" />
-        </div>
-        <div style="font-weight: 800; font-size: 26px; letter-spacing: 0.8px; text-align: center;">RANK S</div>
+    <div style="width: 460px; background: #13161b; border: 1px solid #232730; border-radius: 18px; padding: 24px 32px 32px;">
+      <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 8px;">
+        <img src="/logo.png" alt="Rank S logo" style="width: 240px; height: 240px; object-fit: contain;" />
+        <div style="font-weight: 800; font-size: 26px; letter-spacing: 0.8px; text-align: center; margin-top: -8px;">RANK S</div>
         <div style="font-size: 12.5px; color: #7a818c; text-align: center; margin-top: 2px;">Fitness gym management system</div>
       </div>
 
