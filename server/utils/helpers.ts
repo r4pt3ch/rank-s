@@ -27,7 +27,13 @@ export async function getSettings() {
   if (!doc) {
     doc = await Settings.create({ key: "default" });
   }
-  return { pointsPerCheckIn: doc.pointsPerCheckIn, walkInFee: doc.walkInFee };
+  return {
+    pointsPerCheckIn: doc.pointsPerCheckIn,
+    walkInFee: doc.walkInFee,
+    lobbyAutoClearEnabled: doc.lobbyAutoClearEnabled,
+    lobbyDisplayMinutes: doc.lobbyDisplayMinutes,
+    lobbyResetAt: doc.lobbyResetAt,
+  };
 }
 
 export function rankFromPoints(points: number, thresholds: Record<string, number>) {
