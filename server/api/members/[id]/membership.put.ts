@@ -1,8 +1,16 @@
 import Member from "../../../utils/models/Member";
+import Receipt from "../../../utils/models/Receipt";
 import { connectDB } from "../../../utils/db";
 import { requireRole } from "../../../utils/auth";
-import { computeExpiry, logAudit } from "../../../utils/helpers";
+import { computeExpiry, getMembershipPlan, logAudit } from "../../../utils/helpers";
 import { DURATIONS } from "../../../utils/models/MembershipPlan";
+
+const DURATION_LABEL: Record<string, string> = {
+  monthly: "Monthly",
+  sixmonth: "6 months",
+  yearly: "Yearly",
+  lifetime: "Lifetime",
+};
 
 export default defineEventHandler(async (event) => {
   await connectDB();
@@ -30,12 +38,36 @@ export default defineEventHandler(async (event) => {
   member.membershipExpiry = expiry;
   await member.save();
 
-  await logAudit(user, `Set membership for "${member.name}" to ${category} / ${body.duration}`);
+  // Record the sale of this membership plan, unless explicitly told not to (e.g. correcting a typo, not a real purchase).
+  let saleRecorded = false;
+  let saleAmount = 0;
+  if (body.recordSale !== false) {
+    const plan = await getMembershipPlan(category, body.duration);
+    if (plan && plan.price > 0) {
+      await Receipt.create({
+        name: member.name,
+        items: [{ name: `Membership plan - ${category} (${DURATION_LABEL[body.duration] || body.duration})`, price: plan.price, qty: 1 }],
+        total: plan.price,
+        issuedBy: user.id,
+        kind: "membership",
+      });
+      saleRecorded = true;
+      saleAmount = plan.price;
+    }
+  }
+
+  await logAudit(
+    user,
+    `Set membership for "${member.name}" to ${category} / ${body.duration}${saleRecorded ? ` - recorded sale of ₱${saleAmount}` : ""}`
+  );
+
   return {
     id: String(member._id),
     membershipCategory: member.membershipCategory,
     membershipDuration: member.membershipDuration,
     membershipStart: member.membershipStart,
     membershipExpiry: member.membershipExpiry,
+    saleRecorded,
+    saleAmount,
   };
 });

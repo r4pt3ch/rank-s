@@ -7,7 +7,9 @@ function getRange(period: string) {
   const now = new Date();
   const start = new Date(now);
 
-  if (period === "weekly") {
+  if (period === "alltime") {
+    return { start: new Date(0), end: now };
+  } else if (period === "weekly") {
     start.setDate(start.getDate() - 6);
     start.setHours(0, 0, 0, 0);
   } else if (period === "monthly") {
@@ -29,7 +31,7 @@ export default defineEventHandler(async (event) => {
   await requireRole(event, ["superadmin", "admin"]);
 
   const query = getQuery(event);
-  const period = ["daily", "weekly", "monthly"].includes(String(query.period)) ? String(query.period) : "daily";
+  const period = ["daily", "weekly", "monthly", "alltime"].includes(String(query.period)) ? String(query.period) : "daily";
   const { start, end } = getRange(period);
 
   const [checkins, receipts] = await Promise.all([
@@ -61,13 +63,14 @@ export default defineEventHandler(async (event) => {
       .map(([date, v]) => ({ date, member: v.member, walkin: v.walkin, total: v.member + v.walkin })),
   };
 
-  // --- Inventory sales report ---
+  // --- Inventory sales report (POS product sales + automatic visit fees; excludes membership plan sales) ---
+  const inventoryReceipts = receipts.filter((r) => r.kind !== "membership");
   const productTotals: Record<string, { qty: number; revenue: number }> = {};
   const salesByDay: Record<string, { revenue: number; transactions: number; itemsSold: number }> = {};
   let totalItemsSold = 0;
   let totalRevenue = 0;
 
-  for (const r of receipts) {
+  for (const r of inventoryReceipts) {
     totalRevenue += r.total;
     const key = dayKey(new Date(r.createdAt));
     if (!salesByDay[key]) salesByDay[key] = { revenue: 0, transactions: 0, itemsSold: 0 };
@@ -84,7 +87,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const inventorySales = {
-    totalTransactions: receipts.length,
+    totalTransactions: inventoryReceipts.length,
     totalItemsSold,
     totalRevenue,
     byProduct: Object.entries(productTotals)
@@ -95,10 +98,42 @@ export default defineEventHandler(async (event) => {
       .map(([date, v]) => ({ date, revenue: v.revenue, transactions: v.transactions, itemsSold: v.itemsSold })),
   };
 
+  // --- Membership plan sales report ---
+  const membershipReceipts = receipts.filter((r) => r.kind === "membership");
+  const planTotals: Record<string, { count: number; revenue: number }> = {};
+  const membershipByDay: Record<string, { count: number; revenue: number }> = {};
+  let membershipRevenue = 0;
+
+  for (const r of membershipReceipts) {
+    membershipRevenue += r.total;
+    const key = dayKey(new Date(r.createdAt));
+    if (!membershipByDay[key]) membershipByDay[key] = { count: 0, revenue: 0 };
+    membershipByDay[key].count += 1;
+    membershipByDay[key].revenue += r.total;
+
+    for (const item of r.items || []) {
+      if (!planTotals[item.name]) planTotals[item.name] = { count: 0, revenue: 0 };
+      planTotals[item.name].count += item.qty;
+      planTotals[item.name].revenue += item.price * item.qty;
+    }
+  }
+
+  const membershipSales = {
+    totalSales: membershipReceipts.length,
+    totalRevenue: membershipRevenue,
+    byPlan: Object.entries(planTotals)
+      .map(([name, v]) => ({ name, count: v.count, revenue: v.revenue }))
+      .sort((a, b) => b.revenue - a.revenue),
+    byDay: Object.entries(membershipByDay)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, v]) => ({ date, count: v.count, revenue: v.revenue })),
+  };
+
   return {
     period,
     range: { start, end },
     gymGoers,
     inventorySales,
+    membershipSales,
   };
 });

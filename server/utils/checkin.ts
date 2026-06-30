@@ -115,6 +115,7 @@ export async function performCheckIn(opts: {
         items: [{ name: feeLabel, price: fee, qty: 1 }],
         total: fee,
         issuedBy: opts.issuedBy?.id || null,
+        kind: "visit",
       });
       receiptId = receipt._id;
     }
@@ -164,6 +165,7 @@ export async function performCheckIn(opts: {
       items: [{ name: `Walk-in entrance fee - ${name}`, price: fee, qty: 1 }],
       total: fee,
       issuedBy: opts.issuedBy?.id || null,
+      kind: "visit",
     });
     receiptId = receipt._id;
   }

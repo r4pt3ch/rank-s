@@ -20,6 +20,8 @@ const editing = ref(null);
 const idCardFor = ref(null);
 const membershipFor = ref(null);
 const membershipForm = ref({ category: "", duration: "monthly" });
+const recordSale = ref(true);
+const saleConfirmation = ref("");
 const newMember = ref({ firstName: "", lastName: "", email: "", phone: "", address: "", dob: "" });
 const addError = ref("");
 
@@ -75,19 +77,33 @@ function openMembership(m) {
     category: m.membershipCategory || "",
     duration: m.membershipDuration || "monthly",
   };
+  recordSale.value = true;
 }
 
+const matchedPlan = computed(() => {
+  if (!membershipFor.value) return null;
+  return (plans.value || []).find((p) => p.category === membershipForm.value.category && p.duration === membershipForm.value.duration);
+});
+
 async function saveMembership() {
-  await $fetch(`/api/members/${membershipFor.value.id}/membership`, { method: "PUT", body: membershipForm.value });
+  const result = await $fetch(`/api/members/${membershipFor.value.id}/membership`, {
+    method: "PUT",
+    body: { ...membershipForm.value, recordSale: recordSale.value },
+  });
   membershipFor.value = null;
   await refresh();
+  if (result.saleRecorded) {
+    saleConfirmation.value = `Recorded membership sale of ₱${result.saleAmount.toLocaleString()}.`;
+    setTimeout(() => (saleConfirmation.value = ""), 4000);
+  }
 }
 </script>
 
 <template>
   <div>
     <h1 style="font-size: 22px; font-weight: 800; margin: 0;">Gym members</h1>
-    <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 24px;">Create accounts, issue QR / barcode / PIN credentials, and manage member information and membership.</p>
+    <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 12px;">Create accounts, issue QR / barcode / PIN credentials, and manage member information and membership.</p>
+    <p v-if="saleConfirmation" style="font-size: 13px; color: #8ee0ab; margin: 0 0 18px;">{{ saleConfirmation }}</p>
 
     <div style="display: flex; gap: 10px; margin-bottom: 18px;">
       <input v-model="query" class="rs-input" placeholder="Search members..." />
@@ -225,6 +241,13 @@ async function saveMembership() {
         <div style="font-size: 11.5px; color: #7a8190; margin-bottom: 16px;">
           Setting this starts a new membership period from today. Use this both to assign a first-time membership and to renew an expired one.
         </div>
+        <div v-if="matchedPlan" style="font-size: 13px; margin-bottom: 12px;">
+          Subscription price: <b style="color: #5bb8f5;">₱{{ matchedPlan.price.toLocaleString() }}</b>
+        </div>
+        <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; cursor: pointer;">
+          <input type="checkbox" v-model="recordSale" style="width: 16px; height: 16px;" />
+          <span style="font-size: 12.5px; color: #aab0bb;">Record this as a paid sale in Reports</span>
+        </label>
         <button class="rs-btn-primary" style="width: 100%; justify-content: center;" @click="saveMembership">Save membership</button>
       </div>
     </div>
