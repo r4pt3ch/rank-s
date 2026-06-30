@@ -17,6 +17,8 @@ async function submitMember() {
     pin.value = "";
   } catch (e) {
     error.value = e.data?.statusMessage || "Check-in failed.";
+    pin.value = "";
+    setTimeout(() => (error.value = ""), 4000);
   } finally {
     loading.value = false;
   }
@@ -85,7 +87,7 @@ function backspace() {
 
       <!-- Member PIN entry -->
       <div v-else-if="mode === 'member'" style="background: #13161b; border: 1px solid #232730; border-radius: 16px; padding: 24px;">
-        <div style="text-align: center; font-size: 14px; color: #aab0bb; margin-bottom: 14px;">Enter your 6-digit PIN</div>
+        <div style="text-align: center; font-size: 14px; color: #aab0bb; margin-bottom: 14px;">Enter your PIN</div>
         <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 18px;">
           <div v-for="i in 6" :key="i" style="width: 34px; height: 48px; border: 1px solid #2a2f38; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700;">
             {{ pin[i - 1] ? "•" : "" }}
@@ -93,12 +95,12 @@ function backspace() {
         </div>
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px;">
           <button v-for="d in [1,2,3,4,5,6,7,8,9]" :key="d" class="rs-btn-secondary" style="padding: 16px; font-size: 16px; justify-content: center;" @click="pressDigit(String(d))">{{ d }}</button>
-          <button class="rs-btn-secondary" style="padding: 16px; font-size: 13px; justify-content: center;" @click="mode = null">Cancel</button>
+          <button class="rs-btn-secondary" style="padding: 16px; font-size: 13px; justify-content: center;" @click="mode = null; pin = ''">Cancel</button>
           <button class="rs-btn-secondary" style="padding: 16px; font-size: 16px; justify-content: center;" @click="pressDigit('0')">0</button>
           <button class="rs-btn-secondary" style="padding: 16px; font-size: 13px; justify-content: center;" @click="backspace">⌫</button>
         </div>
         <div v-if="error" style="color: #e88; font-size: 12.5px; text-align: center; margin-bottom: 10px;">{{ error }}</div>
-        <button class="rs-btn-primary" style="width: 100%; justify-content: center;" :disabled="pin.length !== 6 || loading" @click="submitMember">
+        <button class="rs-btn-primary" style="width: 100%; justify-content: center;" :disabled="pin.length < 4 || loading" @click="submitMember">
           {{ loading ? "Checking in..." : "Check in" }}
         </button>
       </div>
