@@ -45,7 +45,7 @@ function genCode(prefix) {
   return `${prefix}-${rand()}${rand()}`;
 }
 function genPin() {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  return String(Math.floor(100000 + Math.random() * 900000));
 }
 function addMonths(date, n) {
   const d = new Date(date);

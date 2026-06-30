@@ -140,7 +140,7 @@ async function saveMembership() {
         <input v-model="newMember.address" class="rs-input" style="margin-bottom: 14px;" />
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Date of birth</label>
         <input v-model="newMember.dob" type="date" class="rs-input" style="margin-bottom: 10px;" />
-        <div style="font-size: 11.5px; color: #7a8190; margin-bottom: 10px;">A unique QR code, barcode, and 4-digit PIN are generated automatically. Membership can be assigned afterward.</div>
+        <div style="font-size: 11.5px; color: #7a8190; margin-bottom: 10px;">A unique QR code, barcode, and 6-digit PIN are generated automatically. Membership can be assigned afterward.</div>
         <div v-if="addError" style="color: #e36b6b; font-size: 12.5px; margin-bottom: 10px;">{{ addError }}</div>
         <button class="rs-btn-primary" style="width: 100%; justify-content: center;" @click="createMember">Create member</button>
       </div>

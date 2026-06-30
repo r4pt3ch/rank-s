@@ -50,11 +50,12 @@ export function genCode(prefix: string) {
 }
 
 export function genPin() {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  // 6 digits supports ~900,000 unique codes - 4 digits topped out at 9,000,
+  // which became a real ceiling once membership grew past that.
+  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 export async function genUniquePin() {
-  // PINs are only 4 digits, so collisions are expected at scale - retry until free.
   for (let attempt = 0; attempt < 50; attempt++) {
     const pin = genPin();
     const exists = await Member.findOne({ pin }).lean();

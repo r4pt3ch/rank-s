@@ -71,9 +71,9 @@ async function checkInWalkIn() {
         </div>
 
         <div style="border-top: 1px solid #1c2026; margin-top: 16px; padding-top: 16px;">
-          <div style="font-weight: 700; font-size: 14px; margin-bottom: 10px;">Or enter 4-digit PIN</div>
+          <div style="font-weight: 700; font-size: 14px; margin-bottom: 10px;">Or enter 6-digit PIN</div>
           <div style="display: flex; gap: 10px;">
-            <input v-model="pinInput" maxlength="4" class="rs-input" placeholder="0000" style="width: 110px;" />
+            <input v-model="pinInput" maxlength="6" class="rs-input" placeholder="000000" style="width: 130px;" />
             <button class="rs-btn-primary" @click="checkInByPin">Check in</button>
           </div>
         </div>

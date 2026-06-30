@@ -55,8 +55,8 @@ async function submitMember() {
       </form>
 
       <form v-else @submit.prevent="submitMember">
-        <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">4-digit PIN</label>
-        <input v-model="pin" maxlength="4" class="rs-input" placeholder="0000" />
+        <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">6-digit PIN</label>
+        <input v-model="pin" maxlength="6" class="rs-input" placeholder="000000" />
         <div v-if="error" style="color: #e36b6b; font-size: 12.5px; margin-top: 12px;">{{ error }}</div>
         <button type="submit" class="rs-btn-primary" style="margin-top: 22px; width: 100%; justify-content: center;">Sign in</button>
       </form>
