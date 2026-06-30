@@ -60,12 +60,6 @@ async function submitMember() {
         <div v-if="error" style="color: #e36b6b; font-size: 12.5px; margin-top: 12px;">{{ error }}</div>
         <button type="submit" class="rs-btn-primary" style="margin-top: 22px; width: 100%; justify-content: center;">Sign in</button>
       </form>
-
-      <div style="margin-top: 18px; font-size: 11.5px; color: #5d6470; line-height: 1.6;">
-        Seeded demo accounts — Super admin: <b style="color:#a3a9b3">super / super123</b><br />
-        Regular admin: <b style="color:#a3a9b3">admin / admin123</b><br />
-        Run <code>npm run seed</code> to print sample member PINs to the console.
-      </div>
     </div>
   </div>
 </template>
