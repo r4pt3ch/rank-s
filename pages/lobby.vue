@@ -20,7 +20,7 @@ function initials(name) {
 <template>
   <div style="min-height: 100vh; background: #0a0b0d; color: #eceef2; font-family: 'Inter', system-ui, sans-serif; padding: 40px;">
     <div style="display: flex; align-items: center; gap: 18px; margin-bottom: 36px;">
-      <img src="/logo.png" alt="Rank S logo" style="width: 160px; height: 160px; object-fit: contain; flex-shrink: 0;" />
+      <img src="/logo.png" alt="Rank S logo" style="width: 190px; height: 190px; object-fit: contain; flex-shrink: 0;" />
       <div>
         <div style="font-weight: 800; font-size: 30px; letter-spacing: 0.8px;">RANK S — LOBBY</div>
         <div style="font-size: 14px; color: #7a818c; margin-top: 2px;">Live check-in board</div>
