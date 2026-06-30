@@ -38,19 +38,21 @@ export default defineEventHandler(async (event) => {
   ]);
 
   // --- Gym goers report ---
-  const memberCheckins = checkins.filter((c) => c.type === "member");
-  const walkinCheckins = checkins.filter((c) => c.type === "walkin");
+  // Same-day repeat check-ins for a member aren't billed and don't count toward attendance stats.
+  const reportableCheckins = checkins.filter((c) => !c.duplicateVisit);
+  const memberCheckins = reportableCheckins.filter((c) => c.type === "member");
+  const walkinCheckins = reportableCheckins.filter((c) => c.type === "walkin");
   const uniqueMemberIds = new Set(memberCheckins.map((c) => String(c.member)));
 
   const goersByDay: Record<string, { member: number; walkin: number }> = {};
-  for (const c of checkins) {
+  for (const c of reportableCheckins) {
     const key = dayKey(new Date(c.createdAt));
     if (!goersByDay[key]) goersByDay[key] = { member: 0, walkin: 0 };
     goersByDay[key][c.type === "member" ? "member" : "walkin"]++;
   }
 
   const gymGoers = {
-    totalCheckins: checkins.length,
+    totalCheckins: reportableCheckins.length,
     memberVisits: memberCheckins.length,
     walkinVisits: walkinCheckins.length,
     uniqueMembers: uniqueMemberIds.size,

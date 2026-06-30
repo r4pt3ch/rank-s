@@ -26,6 +26,7 @@ export default defineEventHandler(async (event) => {
       fee: c.fee,
       billedAs: c.billedAs,
       expiredBilling: c.expiredBilling,
+      duplicateVisit: c.duplicateVisit,
       source: c.source,
     }));
   }

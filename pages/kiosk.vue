@@ -66,7 +66,10 @@ function backspace() {
           <RankBadge :rank="result.rank" size="lg" />
         </div>
         <div v-if="result.leveledUp" style="color: #8ee0ab; font-size: 13px; margin-bottom: 10px;">Leveled up to {{ result.rank }}!</div>
-        <div style="font-size: 13px; color: #aab0bb; margin-bottom: 4px;" v-if="result.fee">
+        <div v-if="result.duplicateVisit" style="font-size: 13px; color: #aab0bb; margin-bottom: 4px;">
+          You already checked in earlier today — no additional fee.
+        </div>
+        <div v-else-if="result.fee" style="font-size: 13px; color: #aab0bb; margin-bottom: 4px;">
           Fee charged: <b style="color: #5bb8f5;">₱{{ result.fee }}</b>
           <span v-if="result.expiredBilling" style="color: #e88;"> (membership expired — billed as walk-in)</span>
         </div>

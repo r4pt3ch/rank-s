@@ -14,6 +14,12 @@ function categoryLabel(category: string) {
   return category.charAt(0).toUpperCase() + category.slice(1);
 }
 
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 export async function performCheckIn(opts: {
   memberId?: string;
   pin?: string;
@@ -34,7 +40,52 @@ export async function performCheckIn(opts: {
   }
 
   if (member) {
-    const oldRank = rankFromPoints(member.points, thresholds);
+    const alreadyToday = await CheckIn.findOne({
+      member: member._id,
+      type: "member",
+      createdAt: { $gte: startOfToday() },
+    }).lean();
+
+    const currentRank = rankFromPoints(member.points, thresholds);
+
+    if (alreadyToday) {
+      // Same member, same day - log the visit for the lobby/monitor, but don't charge again,
+      // don't award points again, and exclude this entry from gym-goer reporting.
+      const checkin = await CheckIn.create({
+        member: member._id,
+        name: member.name,
+        type: "member",
+        rank: currentRank,
+        pointsAwarded: 0,
+        fee: 0,
+        billedAs: "member",
+        expiredBilling: false,
+        duplicateVisit: true,
+        receipt: null,
+        issuedBy: opts.issuedBy?.id || null,
+        source: opts.source,
+      });
+
+      await logAudit(
+        opts.issuedBy || { name: opts.source === "kiosk" ? "Kiosk" : "system" },
+        `Logged repeat same-day check-in for member "${member.name}"${opts.source === "kiosk" ? " via kiosk" : ""} - no charge, not counted in reports`
+      );
+
+      return {
+        id: String(checkin._id),
+        name: member.name,
+        rank: currentRank,
+        points: member.points,
+        leveledUp: false,
+        fee: 0,
+        billedAs: "member",
+        expiredBilling: false,
+        duplicateVisit: true,
+        membershipStatus: membershipStatus(member),
+      };
+    }
+
+    const oldRank = currentRank;
     member.points += settings.pointsPerCheckIn;
     await member.save();
     const newRank = rankFromPoints(member.points, thresholds);
@@ -77,6 +128,7 @@ export async function performCheckIn(opts: {
       fee,
       billedAs,
       expiredBilling,
+      duplicateVisit: false,
       receipt: receiptId,
       issuedBy: opts.issuedBy?.id || null,
       source: opts.source,
@@ -96,6 +148,7 @@ export async function performCheckIn(opts: {
       fee,
       billedAs,
       expiredBilling,
+      duplicateVisit: false,
       membershipStatus: status,
     };
   }
@@ -132,5 +185,5 @@ export async function performCheckIn(opts: {
     `Logged walk-in check-in for "${name}"${opts.source === "kiosk" ? " via kiosk" : ""} (fee ₱${fee})`
   );
 
-  return { id: String(checkin._id), name, rank: null, fee, billedAs: "walkin" };
+  return { id: String(checkin._id), name, rank: null, fee, billedAs: "walkin", duplicateVisit: false };
 }

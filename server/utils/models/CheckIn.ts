@@ -10,6 +10,7 @@ const CheckInSchema = new Schema(
     fee: { type: Number, default: 0 },
     billedAs: { type: String, enum: ["member", "walkin"], default: "walkin" },
     expiredBilling: { type: Boolean, default: false },
+    duplicateVisit: { type: Boolean, default: false }, // true if this member already checked in earlier the same day - not charged, not counted in reports
     receipt: { type: Schema.Types.ObjectId, ref: "Receipt", default: null },
     issuedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     source: { type: String, enum: ["staff", "kiosk"], default: "staff" },

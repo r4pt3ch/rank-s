@@ -8,8 +8,9 @@ const { data: members } = await useFetch("/api/members");
 const { data: checkins, refresh: refreshCheckins } = await useFetch("/api/checkins", { query: { today: "1" } });
 const { data: notifications, refresh: refreshNotifications } = await useFetch("/api/notifications");
 
-const walkins = computed(() => (checkins.value || []).filter((c) => c.type === "walkin").length);
-const memberVisits = computed(() => (checkins.value || []).filter((c) => c.type === "member").length);
+const reportable = computed(() => (checkins.value || []).filter((c) => !c.duplicateVisit));
+const walkins = computed(() => reportable.value.filter((c) => c.type === "walkin").length);
+const memberVisits = computed(() => reportable.value.filter((c) => c.type === "member").length);
 
 const dismissedExpired = ref(false);
 const dismissedExpiring = ref(false);
@@ -63,7 +64,7 @@ async function resetDashboard() {
       </div>
       <div class="rs-card" style="padding: 16px;">
         <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Checked in today</div>
-        <div style="font-size: 26px; font-weight: 800;">{{ checkins?.length || 0 }}</div>
+        <div style="font-size: 26px; font-weight: 800;">{{ reportable.length }}</div>
       </div>
       <div class="rs-card" style="padding: 16px;">
         <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Member visits</div>

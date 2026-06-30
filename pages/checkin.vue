@@ -11,6 +11,7 @@ const matches = computed(() =>
 );
 
 function feeText(result) {
+  if (result.duplicateVisit) return " Already checked in earlier today — no additional fee or points, and not counted again in reports.";
   if (!result.fee) return "";
   if (result.expiredBilling) return ` Membership expired — billed as walk-in: ₱${result.fee}.`;
   return ` Fee charged: ₱${result.fee}.`;
@@ -54,7 +55,10 @@ async function checkInWalkIn() {
 <template>
   <div>
     <h1 style="font-size: 22px; font-weight: 800; margin: 0;">Check-in</h1>
-    <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 24px;">Scan or search to log members and walk-ins coming into the gym. Visit fees are billed and recorded as sales automatically.</p>
+    <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 24px;">
+      Scan or search to log members and walk-ins coming into the gym. Visit fees are billed and recorded as sales automatically.
+      A member's second check-in on the same day isn't charged again and isn't double-counted in reports.
+    </p>
 
     <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px;">
       <div class="rs-card">
@@ -93,7 +97,8 @@ async function checkInWalkIn() {
         <div v-if="!checkins?.length" style="font-size: 13px; color: #5d6470; padding: 18px 0; text-align: center;">No check-ins yet.</div>
         <div v-for="c in checkins" :key="c.id" style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #1c2026;">
           <span style="font-size: 13.5px; font-weight: 600; flex: 1;">{{ c.name }}</span>
-          <span v-if="c.expiredBilling" style="font-size: 10.5px; color: #e88; border: 1px solid #5a2424; border-radius: 5px; padding: 2px 6px;">expired</span>
+          <span v-if="c.duplicateVisit" style="font-size: 10.5px; color: #aab0bb; border: 1px solid #2a2f38; border-radius: 5px; padding: 2px 6px;">repeat visit</span>
+          <span v-else-if="c.expiredBilling" style="font-size: 10.5px; color: #e88; border: 1px solid #5a2424; border-radius: 5px; padding: 2px 6px;">expired</span>
           <span style="font-size: 12px; color: #5bb8f5;">₱{{ c.fee }}</span>
           <span style="font-size: 12px; color: #7a8190;">{{ new Date(c.time).toLocaleTimeString() }}</span>
           <RankBadge v-if="c.rank" :rank="c.rank" size="sm" />
