@@ -10,8 +10,8 @@ import {
   logAudit,
 } from "./helpers";
 
-function categoryLabel(category: string) {
-  return category.charAt(0).toUpperCase() + category.slice(1);
+function tierLabel(tier: string) {
+  return { walkin: "Walk-In", regular: "Regular", elite: "Elite" }[tier] || tier;
 }
 
 function startOfToday() {
@@ -24,6 +24,7 @@ export async function performCheckIn(opts: {
   memberId?: string;
   pin?: string;
   walkinName?: string;
+  walkinStudentType?: "student" | "non-student";
   issuedBy?: { id?: string; name: string } | null;
   source: "staff" | "kiosk";
 }) {
@@ -49,8 +50,6 @@ export async function performCheckIn(opts: {
     const currentRank = rankFromPoints(member.points, thresholds);
 
     if (alreadyToday) {
-      // Same member, same day - log the visit for the lobby/monitor, but don't charge again,
-      // don't award points again, and exclude this entry from gym-goer reporting.
       const checkin = await CheckIn.create({
         member: member._id,
         name: member.name,
@@ -68,7 +67,7 @@ export async function performCheckIn(opts: {
 
       await logAudit(
         opts.issuedBy || { name: opts.source === "kiosk" ? "Kiosk" : "system" },
-        `Logged repeat same-day check-in for member "${member.name}"${opts.source === "kiosk" ? " via kiosk" : ""} - no charge, not counted in reports`
+        `Repeat same-day check-in for "${member.name}" — no charge`
       );
 
       return {
@@ -82,6 +81,7 @@ export async function performCheckIn(opts: {
         expiredBilling: false,
         duplicateVisit: true,
         membershipStatus: membershipStatus(member),
+        studentType: member.membershipStudentType || "non-student",
       };
     }
 
@@ -91,22 +91,26 @@ export async function performCheckIn(opts: {
     const newRank = rankFromPoints(member.points, thresholds);
 
     const status = membershipStatus(member);
+    const studentType: string = member.membershipStudentType || "non-student";
     let fee = 0;
     let billedAs: "member" | "walkin" = "member";
     let expiredBilling = false;
     let feeLabel = `Gym visit fee - ${member.name}`;
 
     if (status === "expired") {
-      fee = settings.walkInFee;
+      // expired → charge walk-in rate based on their student type
+      fee = studentType === "student" ? settings.walkInFeeStudent : settings.walkInFeeNonStudent;
       billedAs = "walkin";
       expiredBilling = true;
-      feeLabel = `Gym visit (expired membership, billed as walk-in) - ${member.name}`;
-    } else if (status === "active" && (member.membershipTier || member.membershipCategory) && member.membershipDuration) {
+      feeLabel = `Gym visit (expired membership, billed as walk-in ${studentType}) - ${member.name}`;
+    } else if (status === "active") {
       const tier = member.membershipTier || member.membershipCategory;
-      const plan = await getMembershipPlan(tier, member.membershipDuration);
-      fee = plan?.visitFee || 0;
-      billedAs = "member";
-      feeLabel = `Gym visit fee (${categoryLabel(tier)}) - ${member.name}`;
+      if (tier && member.membershipDuration) {
+        const plan = await getMembershipPlan(tier, member.membershipDuration, studentType);
+        fee = plan?.visitFee || 0;
+        billedAs = "member";
+        feeLabel = `Gym visit fee (${tierLabel(tier)} / ${studentType}) - ${member.name}`;
+      }
     }
 
     let receiptId = null;
@@ -138,7 +142,7 @@ export async function performCheckIn(opts: {
 
     await logAudit(
       opts.issuedBy || { name: opts.source === "kiosk" ? "Kiosk" : "system" },
-      `Checked in member "${member.name}"${opts.source === "kiosk" ? " via kiosk" : ""} (+${settings.pointsPerCheckIn} pts${fee > 0 ? `, fee ₱${fee}` : ""})`
+      `Checked in "${member.name}" (${studentType})${opts.source === "kiosk" ? " via kiosk" : ""} (+${settings.pointsPerCheckIn} pts${fee > 0 ? `, fee ₱${fee}` : ""})`
     );
 
     return {
@@ -152,18 +156,20 @@ export async function performCheckIn(opts: {
       expiredBilling,
       duplicateVisit: false,
       membershipStatus: status,
+      studentType,
     };
   }
 
-  // walk-in
+  // walk-in — staff selects student or non-student
   const name = opts.walkinName || "Walk-in guest";
-  const fee = settings.walkInFee;
+  const walkinStudentType = opts.walkinStudentType || "non-student";
+  const fee = walkinStudentType === "student" ? settings.walkInFeeStudent : settings.walkInFeeNonStudent;
 
   let receiptId = null;
   if (fee > 0) {
     const receipt = await Receipt.create({
       name,
-      items: [{ name: `Walk-in entrance fee - ${name}`, price: fee, qty: 1 }],
+      items: [{ name: `Walk-in entrance fee (${walkinStudentType}) - ${name}`, price: fee, qty: 1 }],
       total: fee,
       issuedBy: opts.issuedBy?.id || null,
       kind: "visit",
@@ -185,8 +191,8 @@ export async function performCheckIn(opts: {
 
   await logAudit(
     opts.issuedBy || { name: opts.source === "kiosk" ? "Kiosk" : "system" },
-    `Logged walk-in check-in for "${name}"${opts.source === "kiosk" ? " via kiosk" : ""} (fee ₱${fee})`
+    `Walk-in check-in: "${name}" (${walkinStudentType}) (fee ₱${fee})`
   );
 
-  return { id: String(checkin._id), name, rank: null, fee, billedAs: "walkin", duplicateVisit: false };
+  return { id: String(checkin._id), name, rank: null, fee, billedAs: "walkin", duplicateVisit: false, studentType: walkinStudentType };
 }

@@ -18,7 +18,8 @@ const MemberSchema = new Schema(
 
     // free text so admins can define their own membership categories, not locked to a fixed list
     membershipTier:     { type: String, enum: ["walkin", "regular", "elite", null], default: null },
-    membershipCategory: { type: String, default: null }, // kept for backward-compat display
+    membershipCategory: { type: String, default: null },
+    membershipStudentType: { type: String, enum: ["student", "non-student", null], default: null },
     membershipDuration: { type: String, enum: ["daily", "monthly", "quarterly", "sixmonth", "yearly", "lifetime", null], default: null },
     membershipStart:    { type: Date, default: null },
     membershipExpiry:   { type: Date, default: null },

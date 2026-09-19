@@ -32,7 +32,8 @@ export default defineEventHandler(async (event) => {
   const expiry = body.duration ? computeExpiry(start, body.duration) : null;
 
   member.membershipTier = body.tier;
-  member.membershipCategory = body.tier; // keep in sync for backward compat
+  member.membershipCategory = body.tier;
+  member.membershipStudentType = body.studentType || "non-student";
   member.membershipDuration = body.duration || null;
   member.membershipStart = start;
   member.membershipExpiry = expiry;
@@ -41,7 +42,7 @@ export default defineEventHandler(async (event) => {
   let saleRecorded = false;
   let saleAmount = 0;
   if (body.recordSale !== false && body.duration) {
-    const plan = await getMembershipPlan(body.tier, body.duration);
+    const plan = await getMembershipPlan(body.tier, body.duration, body.studentType || "non-student");
     if (plan && plan.price > 0) {
       await Receipt.create({
         name: member.name,

@@ -38,6 +38,7 @@ export default defineEventHandler(async (event) => {
       memberId: body.memberId,
       pin: body.pin,
       walkinName: body.name,
+      walkinStudentType: body.studentType || "non-student",
       issuedBy: user,
       source: "staff",
     });

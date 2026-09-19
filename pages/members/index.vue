@@ -74,7 +74,8 @@ async function resetCredentials(id) {
 function openMembership(m) {
   membershipFor.value = m;
   membershipForm.value = {
-    category: m.membershipCategory || "",
+    tier: m.membershipTier || m.membershipCategory || "regular",
+    studentType: m.membershipStudentType || "non-student",
     duration: m.membershipDuration || "monthly",
   };
   recordSale.value = true;
@@ -82,7 +83,11 @@ function openMembership(m) {
 
 const matchedPlan = computed(() => {
   if (!membershipFor.value) return null;
-  return (plans.value || []).find((p) => p.category === membershipForm.value.category && p.duration === membershipForm.value.duration);
+  return (plans.value || []).find((p) =>
+    p.tier === membershipForm.value.tier &&
+    p.studentType === membershipForm.value.studentType &&
+    p.duration === membershipForm.value.duration
+  );
 });
 
 async function saveMembership() {
@@ -228,12 +233,20 @@ async function saveMembership() {
             ({{ new Date(membershipFor.membershipExpiry).toLocaleDateString() }})
           </span>
         </div>
-        <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Category</label>
-        <input v-model="membershipForm.category" class="rs-input" placeholder="e.g. Student, Regular, VIP..." list="member-category-suggestions" style="margin-bottom: 4px;" />
-        <datalist id="member-category-suggestions">
-          <option v-for="c in categories" :key="c" :value="c" />
-        </datalist>
-        <div style="font-size: 11px; color: #5d6470; margin-bottom: 14px;">Must match a category configured on the Membership plans page for the visit fee to apply.</div>
+        <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Tier</label>
+        <select v-model="membershipForm.tier" class="rs-input" style="margin-bottom: 14px;">
+          <option value="regular">Regular Member (Rank E–A)</option>
+          <option value="elite">Elite Member (Rank S)</option>
+        </select>
+        <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Student type</label>
+        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+          <button class="rs-btn-secondary" style="flex:1; justify-content:center; font-size:12.5px;"
+            :style="{ background: membershipForm.studentType==='student' ? '#1c2128':'transparent', color: membershipForm.studentType==='student' ? '#5bb8f5':'#aab0bb', borderColor: membershipForm.studentType==='student' ? '#2f8fd6':'#2a2f38' }"
+            @click="membershipForm.studentType='student'">Student</button>
+          <button class="rs-btn-secondary" style="flex:1; justify-content:center; font-size:12.5px;"
+            :style="{ background: membershipForm.studentType==='non-student' ? '#1c2128':'transparent', color: membershipForm.studentType==='non-student' ? '#5bb8f5':'#aab0bb', borderColor: membershipForm.studentType==='non-student' ? '#2f8fd6':'#2a2f38' }"
+            @click="membershipForm.studentType='non-student'">Non-student</button>
+        </div>
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Duration</label>
         <select v-model="membershipForm.duration" class="rs-input" style="margin-bottom: 10px;">
           <option v-for="d in DURATIONS" :key="d.id" :value="d.id">{{ d.label }}</option>

@@ -3,12 +3,15 @@ import mongoose, { Schema } from "mongoose";
 const SettingsSchema = new Schema({
   key: { type: String, default: "default", unique: true },
   pointsPerCheckIn: { type: Number, default: 20 },
-  walkInFee: { type: Number, default: 50 },
+
+  // Separate walk-in fees for student and non-student
+  walkInFeeStudent:    { type: Number, default: 40 },
+  walkInFeeNonStudent: { type: Number, default: 60 },
 
   // Lobby display controls
   lobbyAutoClearEnabled: { type: Boolean, default: false },
-  lobbyDisplayMinutes: { type: Number, default: 60 }, // how long a check-in stays visible on the board
-  lobbyResetAt: { type: Date, default: null }, // set when staff manually clear the board
+  lobbyDisplayMinutes:   { type: Number, default: 60 },
+  lobbyResetAt:          { type: Date, default: null },
 });
 
 export default mongoose.models.Settings || mongoose.model("Settings", SettingsSchema);

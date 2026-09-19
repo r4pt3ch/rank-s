@@ -7,6 +7,7 @@ const tab = ref("member"); // 'member' | 'walkin'
 const search = ref("");
 const pinInput = ref("");
 const walkinName = ref("");
+const walkinStudentType = ref("non-student");
 const feedback = ref(null);
 
 // services modal state
@@ -86,8 +87,8 @@ async function checkInByPin() {
 async function checkInWalkIn() {
   if (!walkinName.value) return;
   try {
-    const result = await $fetch("/api/checkins", { method: "POST", body: { name: walkinName.value } });
-    feedback.value = { ok: true, text: `Walk-in "${walkinName.value}" logged.${feeText(result)}` };
+    const result = await $fetch("/api/checkins", { method: "POST", body: { name: walkinName.value, studentType: walkinStudentType.value } });
+    feedback.value = { ok: true, text: `Walk-in "${walkinName.value}" (${walkinStudentType.value}) logged.${feeText(result)}` };
     walkinName.value = "";
     await refresh();
     openServicesModal(result.id, result.name);
@@ -139,10 +140,19 @@ function reopenServices(c) {
         <!-- Walk-in tab -->
         <template v-else>
           <div style="background: #1c2128; border: 1px solid #2a2f38; border-radius: 10px; padding: 16px; margin-bottom: 14px;">
-            <div style="font-size: 12.5px; color: #aab0bb; margin-bottom: 6px;">Walk-ins are logged as <b style="color:#f3a8a8">Rank F</b>. They are charged the walk-in fee set in Settings.</div>
+            <div style="font-size: 12.5px; color: #aab0bb; margin-bottom: 6px;">Walk-ins are logged as <b style="color:#f3a8a8">Rank F</b>. Fee is based on student type (set in Settings).</div>
           </div>
           <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Guest name</label>
           <input v-model="walkinName" class="rs-input" placeholder="Guest's name" style="margin-bottom: 14px;" @keyup.enter="checkInWalkIn" />
+          <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Student type</label>
+          <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+            <button class="rs-btn-secondary" style="flex:1; justify-content:center; font-size:12.5px;"
+              :style="{ background: walkinStudentType==='student' ? '#1c2128':'transparent', color: walkinStudentType==='student' ? '#5bb8f5':'#aab0bb', borderColor: walkinStudentType==='student' ? '#2f8fd6':'#2a2f38' }"
+              @click="walkinStudentType='student'">Student</button>
+            <button class="rs-btn-secondary" style="flex:1; justify-content:center; font-size:12.5px;"
+              :style="{ background: walkinStudentType==='non-student' ? '#1c2128':'transparent', color: walkinStudentType==='non-student' ? '#5bb8f5':'#aab0bb', borderColor: walkinStudentType==='non-student' ? '#2f8fd6':'#2a2f38' }"
+              @click="walkinStudentType='non-student'">Non-student</button>
+          </div>
           <button class="rs-btn-primary" style="width:100%; justify-content:center;" :disabled="!walkinName" @click="checkInWalkIn">Log walk-in</button>
         </template>
 

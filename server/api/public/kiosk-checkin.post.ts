@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
     if (!body.name) {
       throw createError({ statusCode: 400, statusMessage: "Enter your name to check in." });
     }
-    return performCheckIn({ walkinName: body.name, issuedBy: null, source: "kiosk" });
+    return performCheckIn({ walkinName: body.name, walkinStudentType: body.studentType || "non-student", issuedBy: null, source: "kiosk" });
   }
 
   throw createError({ statusCode: 400, statusMessage: "Specify mode as 'member' or 'walkin'." });

@@ -5,11 +5,12 @@ import { logAudit } from "../utils/helpers";
 
 function serialize(doc: any) {
   return {
-    pointsPerCheckIn: doc.pointsPerCheckIn,
-    walkInFee: doc.walkInFee,
+    pointsPerCheckIn:    doc.pointsPerCheckIn,
+    walkInFeeStudent:    doc.walkInFeeStudent,
+    walkInFeeNonStudent: doc.walkInFeeNonStudent,
     lobbyAutoClearEnabled: doc.lobbyAutoClearEnabled,
-    lobbyDisplayMinutes: doc.lobbyDisplayMinutes,
-    lobbyResetAt: doc.lobbyResetAt,
+    lobbyDisplayMinutes:   doc.lobbyDisplayMinutes,
+    lobbyResetAt:          doc.lobbyResetAt,
   };
 }
 
@@ -41,13 +42,18 @@ export default defineEventHandler(async (event) => {
       changes.push(`points per check-in to ${value}`);
     }
 
-    if (body.walkInFee !== undefined) {
-      const fee = Number(body.walkInFee);
-      if (!Number.isFinite(fee) || fee < 0) {
-        throw createError({ statusCode: 400, statusMessage: "Walk-in fee must be a non-negative number." });
-      }
-      doc.walkInFee = fee;
-      changes.push(`walk-in fee to ₱${fee}`);
+    if (body.walkInFeeStudent !== undefined) {
+      const fee = Number(body.walkInFeeStudent);
+      if (!Number.isFinite(fee) || fee < 0) throw createError({ statusCode: 400, statusMessage: "Walk-in fee must be a non-negative number." });
+      doc.walkInFeeStudent = fee;
+      changes.push(`student walk-in fee to ₱${fee}`);
+    }
+
+    if (body.walkInFeeNonStudent !== undefined) {
+      const fee = Number(body.walkInFeeNonStudent);
+      if (!Number.isFinite(fee) || fee < 0) throw createError({ statusCode: 400, statusMessage: "Walk-in fee must be a non-negative number." });
+      doc.walkInFeeNonStudent = fee;
+      changes.push(`non-student walk-in fee to ₱${fee}`);
     }
 
     if (body.lobbyAutoClearEnabled !== undefined) {

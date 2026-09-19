@@ -29,7 +29,10 @@ export async function getSettings() {
   }
   return {
     pointsPerCheckIn: doc.pointsPerCheckIn,
-    walkInFee: doc.walkInFee,
+    walkInFeeStudent:    doc.walkInFeeStudent,
+    walkInFeeNonStudent: doc.walkInFeeNonStudent,
+    // backward-compat alias used in older code paths
+    walkInFee: doc.walkInFeeNonStudent,
     lobbyAutoClearEnabled: doc.lobbyAutoClearEnabled,
     lobbyDisplayMinutes: doc.lobbyDisplayMinutes,
     lobbyResetAt: doc.lobbyResetAt,
@@ -83,8 +86,10 @@ export function membershipStatus(member: { membershipTier?: string | null; membe
   return new Date(member.membershipExpiry) < new Date() ? "expired" : "active";
 }
 
-export async function getMembershipPlan(tier: string, duration: string) {
-  return MembershipPlan.findOne({ tier, duration }).lean();
+export async function getMembershipPlan(tier: string, duration: string, studentType?: string) {
+  const query: Record<string, any> = { tier, duration };
+  if (studentType) query.studentType = studentType;
+  return MembershipPlan.findOne(query).lean();
 }
 
 // "Marco Dela Cruz" -> "Marco D." - used on the public lobby display so full names aren't shown.
