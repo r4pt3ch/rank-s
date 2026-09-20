@@ -3,10 +3,10 @@ const { data: plans, refresh } = await useFetch("/api/membership-plans");
 
 const TIERS = [
   { id: "walkin",  label: "Walk-In", rankLabel: "Rank F" },
-  { id: "regular", label: "Regular Member", rankLabel: "Rank E–A", durations: ["daily","monthly","quarterly","sixmonth","yearly"] },
-  { id: "elite",   label: "Elite Member",   rankLabel: "Rank S",   durations: ["monthly","quarterly","sixmonth","yearly"] },
+  { id: "regular", label: "Regular Member", rankLabel: "Rank E–A", durations: ["daily","weekly","monthly","annual"] },
+  { id: "elite",   label: "Elite Member",   rankLabel: "Rank S",   durations: ["monthly","annual"] },
 ];
-const DURATION_LABELS = { daily:"Daily", monthly:"Monthly", quarterly:"Quarterly", sixmonth:"6 months", yearly:"Yearly" };
+const DURATION_LABELS = { daily:"Daily", weekly:"Weekly", monthly:"Monthly", annual:"Annual" };
 
 const editing = ref(null);
 const showAdd = ref(false);
@@ -127,7 +127,7 @@ async function deletePlan(id) {
         </div>
         <label style="font-size:12px;color:#9aa1ab;display:block;margin-bottom:6px;">Duration</label>
         <select v-model="newPlan.duration" class="rs-input" style="margin-bottom:14px;">
-          <option v-for="dur in (newPlan.tier==='elite' ? ['monthly','quarterly','sixmonth','yearly'] : ['daily','monthly','quarterly','sixmonth','yearly'])" :key="dur" :value="dur">{{ DURATION_LABELS[dur] }}</option>
+          <option v-for="dur in (newPlan.tier==='elite' ? ['monthly','annual'] : ['daily','weekly','monthly','annual'])" :key="dur" :value="dur">{{ DURATION_LABELS[dur] }}</option>
         </select>
         <label style="font-size:12px;color:#9aa1ab;display:block;margin-bottom:6px;">Subscription price (₱)</label>
         <input v-model="newPlan.price" type="number" min="0" class="rs-input" style="margin-bottom:14px;" />
