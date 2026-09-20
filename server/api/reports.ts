@@ -181,6 +181,4 @@ export default defineEventHandler(async (event) => {
     inventorySales,
     membershipSales,
   };
-    membershipSales,
-  };
 });
