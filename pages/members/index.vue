@@ -20,7 +20,7 @@ const editing = ref(null);
 const idCardFor = ref(null);
 const membershipFor = ref(null);
 const membershipForm = ref({ category: "", duration: "monthly" });
-const recordSale = ref(true);
+const recordSale = ref(false);
 const saleConfirmation = ref("");
 
 // Pause / Resume
@@ -115,7 +115,7 @@ function openMembership(m) {
     studentType: m.membershipStudentType || "non-student",
     duration: m.membershipDuration || "monthly",
   };
-  recordSale.value = true;
+  recordSale.value = false;
 }
 
 const matchedPlan = computed(() => {
@@ -229,6 +229,30 @@ async function saveMembership() {
         <input v-model="editing.address" class="rs-input" style="margin-bottom: 14px;" />
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Points</label>
         <input v-model.number="editing.points" type="number" class="rs-input" style="margin-bottom: 16px;" />
+
+        <!-- Subscription status quick actions -->
+        <div v-if="editing.membershipDuration" style="border-top:1px solid #1c2026; padding-top:14px; margin-bottom:16px;">
+          <div style="font-size:12px; color:#9aa1ab; margin-bottom:8px;">Subscription</div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:12.5px; font-weight:600;" :style="{ color: editing.membershipPaused ? '#f3c44b' : editing.membershipStatus === 'active' ? '#8ee0ab' : '#e88' }">
+              {{ editing.membershipPaused ? "Paused" : editing.membershipStatus === "active" ? "Active" : "Expired" }}
+            </span>
+            <span style="font-size:12px; color:#7a8190;">
+              {{ editing.membershipTier || editing.membershipCategory }} / {{ editing.membershipDuration }}
+              <template v-if="editing.membershipExpiry"> · Expires {{ formatDate(editing.membershipExpiry) }}</template>
+            </span>
+          </div>
+          <div v-if="editing.membershipPaused && editing.membershipPauseReason" style="font-size:11.5px; color:#aab0bb; margin-top:6px;">
+            Paused: "{{ editing.membershipPauseReason }}"
+          </div>
+          <button v-if="editing.membershipPaused"
+            class="rs-btn-secondary"
+            style="margin-top:10px; width:100%; justify-content:center; color:#8ee0ab; border-color:#245a34;"
+            @click="resumeFor = editing; editing = null">
+            Resume subscription
+          </button>
+        </div>
+
         <button class="rs-btn-primary" style="width: 100%; justify-content: center;" @click="saveEdit">Save changes</button>
       </div>
     </div>

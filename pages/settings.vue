@@ -10,6 +10,21 @@ const saved = ref(false);
 const error = ref("");
 const clearing = ref(false);
 const cleared = ref(false);
+const clearingReports = ref(false);
+const reportsCleared = ref(false);
+const confirmClearReports = ref(false);
+
+async function clearReportsData() {
+  clearingReports.value = true;
+  try {
+    const result = await $fetch("/api/clear-reports", { method: "POST" });
+    reportsCleared.value = true;
+    confirmClearReports.value = false;
+    setTimeout(() => (reportsCleared.value = false), 4000);
+  } finally {
+    clearingReports.value = false;
+  }
+}
 
 async function save() {
   error.value = "";
@@ -90,6 +105,28 @@ async function clearLobbyNow() {
         </button>
         <div v-if="cleared" style="margin-top: 10px; font-size: 12.5px; color: #8ee0ab; text-align: center;">Lobby display cleared.</div>
       </div>
+    </div>
+
+    <div class="rs-card" style="max-width: 460px; border-color: #5a2424;">
+      <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #e88;">Clear report data</div>
+      <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 16px;">
+        Permanently deletes all check-in records and receipts from the database. This cannot be undone. Member accounts, membership plans, and settings are not affected.
+      </p>
+      <div v-if="reportsCleared" style="font-size: 13px; color: #8ee0ab; margin-bottom: 12px;">All report data has been cleared.</div>
+      <template v-if="!confirmClearReports">
+        <button class="rs-btn-secondary" style="width:100%; justify-content:center; color:#e88; border-color:#5a2424;" @click="confirmClearReports=true">
+          Clear all report data
+        </button>
+      </template>
+      <template v-else>
+        <div style="font-size:13px; color:#e88; font-weight:600; margin-bottom:12px;">Are you sure? This will permanently delete all check-ins and receipts.</div>
+        <div style="display:flex; gap:8px;">
+          <button class="rs-btn-secondary" style="flex:1; justify-content:center;" @click="confirmClearReports=false">Cancel</button>
+          <button class="rs-btn-secondary" style="flex:1; justify-content:center; color:#e88; border-color:#5a2424;" :disabled="clearingReports" @click="clearReportsData">
+            {{ clearingReports ? "Clearing..." : "Yes, delete everything" }}
+          </button>
+        </div>
+      </template>
     </div>
   </div>
 </template>
