@@ -36,7 +36,7 @@ async function deleteUser(id) {
 }
 
 function roleLabel(role) {
-  return role === "superadmin" ? "Super admin" : "Regular admin";
+  return role === "superadmin" ? "Super admin" : role === "user" ? "Normal user" : "Regular admin";
 }
 </script>
 
@@ -85,6 +85,7 @@ function roleLabel(role) {
         <input v-model="newUser.email" class="rs-input" placeholder="maria@example.com" style="margin-bottom:14px;" />
         <label style="font-size:12px; color:#9aa1ab; display:block; margin-bottom:6px;">Role</label>
         <select v-model="newUser.role" class="rs-input" style="margin-bottom:14px;">
+          <option value="user">Normal user</option>
           <option value="admin">Regular admin</option>
           <option value="superadmin">Super admin</option>
         </select>
@@ -108,6 +109,7 @@ function roleLabel(role) {
         <input v-model="editing.email" class="rs-input" style="margin-bottom:14px;" />
         <label style="font-size:12px; color:#9aa1ab; display:block; margin-bottom:6px;">Role</label>
         <select v-model="editing.role" class="rs-input" style="margin-bottom:14px;">
+          <option value="user">Normal user</option>
           <option value="admin">Regular admin</option>
           <option value="superadmin">Super admin</option>
         </select>

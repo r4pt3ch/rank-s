@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const method = event.method;
 
   if (method === "GET") {
-    await requireRole(event, ["superadmin", "admin"]);
+    await requireRole(event, ["superadmin", "admin", "user"]);
     const query = getQuery(event);
     const filter: Record<string, any> = {};
     if (query.today === "1") {
@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (method === "POST") {
-    const user = await requireRole(event, ["superadmin", "admin"]);
+    const user = await requireRole(event, ["superadmin", "admin", "user"]);
     const body = await readBody(event);
     const result = await performCheckIn({
       memberId: body.memberId,

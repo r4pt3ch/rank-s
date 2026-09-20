@@ -4,7 +4,7 @@ import { requireRole } from "../utils/auth";
 
 export default defineEventHandler(async (event) => {
   await connectDB();
-  await requireRole(event, ["superadmin", "admin"]);
+  await requireRole(event, ["superadmin", "admin", "user"]);
 
   const pending = await CheckIn.find({ voidStatus: "pending" })
     .populate("voidRequestedBy", "name username")

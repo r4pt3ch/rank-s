@@ -18,7 +18,7 @@ function dateOnly(d: Date): Date {
 
 export default defineEventHandler(async (event) => {
   await connectDB();
-  const user = await requireRole(event, ["superadmin", "admin"]);
+  const user = await requireRole(event, ["superadmin", "admin", "user"]);
   const id = getRouterParam(event, "id");
   const body = await readBody(event);
 

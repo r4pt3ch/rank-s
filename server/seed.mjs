@@ -73,6 +73,7 @@ async function run() {
   await User.create([
     { username: "super", passwordHash: await bcrypt.hash("super123", 10), name: "Admin Reyes", email: "", role: "superadmin" },
     { username: "admin", passwordHash: await bcrypt.hash("admin123", 10), name: "Front Desk - Jen", email: "", role: "admin" },
+    { username: "staff", passwordHash: await bcrypt.hash("staff123", 10), name: "Front Desk - Staff", email: "", role: "user" },
   ]);
 
   const now = new Date();
@@ -169,6 +170,7 @@ async function run() {
   console.log("Seed complete.");
   console.log("Super admin login: super / super123");
   console.log("Regular admin login: admin / admin123");
+  console.log("Normal user login: staff / staff123");
   const sample = await Member.find().lean();
   console.log("Sample member PINs:", sample.map((m) => `${m.name}: ${m.pin}`));
   console.log("Note: Liam Tan's membership is seeded as already expired, to demo the expired-billing flow.");

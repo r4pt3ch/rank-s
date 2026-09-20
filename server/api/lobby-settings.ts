@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const method = event.method;
 
   if (method === "GET") {
-    await requireRole(event, ["superadmin", "admin"]);
+    await requireRole(event, ["superadmin", "admin", "user"]);
     let doc = await Settings.findOne({ key: "default" });
     if (!doc) doc = await Settings.create({ key: "default" });
     return {
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (method === "PUT") {
-    const user = await requireRole(event, ["superadmin", "admin"]);
+    const user = await requireRole(event, ["superadmin", "admin", "user"]);
     const body = await readBody(event);
     let doc = await Settings.findOne({ key: "default" });
     if (!doc) doc = await Settings.create({ key: "default" });

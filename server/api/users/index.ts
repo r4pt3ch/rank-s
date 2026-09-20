@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     if (existing) {
       throw createError({ statusCode: 409, statusMessage: "That username is already taken." });
     }
-    const role = body.role === "superadmin" ? "superadmin" : "admin";
+    const role = body.role === "superadmin" ? "superadmin" : body.role === "user" ? "user" : "admin";
     const user = await User.create({
       username: String(body.username).toLowerCase().trim(),
       passwordHash: await bcrypt.hash(body.password, 10),

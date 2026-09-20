@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const method = event.method;
 
   if (method === "GET") {
-    await requireRole(event, ["superadmin", "admin"]);
+    await requireRole(event, ["superadmin", "admin", "user"]);
     const members = await Member.find().sort({ createdAt: -1 }).lean();
     const thresholds = await getThresholds();
     return members.map((m) => ({
@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (method === "POST") {
-    const user = await requireRole(event, ["superadmin", "admin"]);
+    const user = await requireRole(event, ["superadmin", "admin", "user"]);
     const body = await readBody(event);
     const firstName = String(body.firstName || "").trim();
     const lastName = String(body.lastName || "").trim();

@@ -42,7 +42,7 @@ function dayKey(date: Date) {
 
 export default defineEventHandler(async (event) => {
   await connectDB();
-  await requireRole(event, ["superadmin", "admin"]);
+  await requireRole(event, ["superadmin", "admin", "user"]);
 
   const query = getQuery(event);
   const period = ["daily", "weekly", "monthly", "alltime", "custom"].includes(String(query.period)) ? String(query.period) : "daily";

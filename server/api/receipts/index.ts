@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const method = event.method;
 
   if (method === "GET") {
-    await requireRole(event, ["superadmin", "admin"]);
+    await requireRole(event, ["superadmin", "admin", "user"]);
     const receipts = await Receipt.find().sort({ createdAt: -1 }).limit(100).populate("issuedBy", "name").lean();
     return receipts.map((r: any) => ({
       id: String(r._id),
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (method === "POST") {
-    const user = await requireRole(event, ["superadmin", "admin"]);
+    const user = await requireRole(event, ["superadmin", "admin", "user"]);
     const body = await readBody(event);
     if (!body.name || !Array.isArray(body.items)) {
       throw createError({ statusCode: 400, statusMessage: "Receipt name and items are required." });

@@ -5,7 +5,7 @@ import { logAudit } from "../utils/helpers";
 
 export default defineEventHandler(async (event) => {
   await connectDB();
-  const user = await requireRole(event, ["superadmin", "admin"]);
+  const user = await requireRole(event, ["superadmin", "admin", "user"]);
 
   let doc = await Settings.findOne({ key: "default" });
   if (!doc) doc = await Settings.create({ key: "default" });

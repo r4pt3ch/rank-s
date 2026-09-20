@@ -57,7 +57,7 @@ async function changePassword() {
         <input v-model="form.name" class="rs-input" style="margin-bottom: 14px;" />
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Email</label>
         <input v-model="form.email" class="rs-input" placeholder="you@example.com" style="margin-bottom: 10px;" />
-        <div style="font-size: 11.5px; color: #7a8190; margin-bottom: 14px;">Role: {{ data.role === "superadmin" ? "Super admin" : "Regular admin" }}</div>
+        <div style="font-size: 11.5px; color: #7a8190; margin-bottom: 14px;">Role: {{ data.role === "superadmin" ? "Super admin" : data.role === "user" ? "Normal user" : "Regular admin" }}</div>
         <div v-if="error" style="color: #e36b6b; font-size: 12.5px; margin-bottom: 10px;">{{ error }}</div>
         <button class="rs-btn-primary" style="width: 100%; justify-content: center;" @click="saveProfile">Save profile</button>
         <div v-if="saved" style="margin-top: 10px; font-size: 12.5px; color: #8ee0ab; text-align: center;">Profile saved.</div>

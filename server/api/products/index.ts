@@ -8,13 +8,13 @@ export default defineEventHandler(async (event) => {
   const method = event.method;
 
   if (method === "GET") {
-    await requireRole(event, ["superadmin", "admin"]);
+    await requireRole(event, ["superadmin", "admin", "user"]);
     const products = await Product.find().sort({ name: 1 }).lean();
     return products.map((p) => ({ id: String(p._id), ...p }));
   }
 
   if (method === "POST") {
-    const user = await requireRole(event, ["superadmin", "admin"]);
+    const user = await requireRole(event, ["superadmin", "admin", "user"]);
     const body = await readBody(event);
     if (!body.name || body.price === undefined) {
       throw createError({ statusCode: 400, statusMessage: "Product name and price are required." });

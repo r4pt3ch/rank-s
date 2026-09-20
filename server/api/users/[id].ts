@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     const changes: string[] = [];
     if (body.name !== undefined) { user.name = body.name; changes.push("name"); }
     if (body.email !== undefined) { user.email = body.email; changes.push("email"); }
-    if (body.role !== undefined && ["superadmin", "admin"].includes(body.role)) { user.role = body.role; changes.push("role"); }
+    if (body.role !== undefined && ["superadmin", "admin", "user"].includes(body.role)) { user.role = body.role; changes.push("role"); }
 
     if (body.newPassword) {
       if (String(body.newPassword).length < 6) {

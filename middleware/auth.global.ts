@@ -15,10 +15,14 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   const role = user.value.role;
   const superAdminOnly = ["/audit", "/loginlogs", "/users"];
-  const staffOnly = ["/members", "/membership-plans", "/checkin", "/receipts", "/pos", "/inventory", "/monitor", "/account", "/reports", "/thresholds", "/settings", "/receipt-settings", "/services"];
+  const adminAndAbove = ["/membership-plans", "/services", "/thresholds", "/settings", "/receipt-settings"];
+  const staffOnly = ["/members", "/checkin", "/receipts", "/pos", "/inventory", "/monitor", "/account", "/reports"];
 
-  if (role === "member" && staffOnly.concat(superAdminOnly).some((p) => to.path.startsWith(p))) {
+  if (role === "member" && [...staffOnly, ...adminAndAbove, ...superAdminOnly].some((p) => to.path.startsWith(p))) {
     return navigateTo("/profile");
+  }
+  if (role === "user" && [...adminAndAbove, ...superAdminOnly].some((p) => to.path.startsWith(p))) {
+    return navigateTo("/");
   }
   if (role === "admin" && superAdminOnly.some((p) => to.path.startsWith(p))) {
     return navigateTo("/");

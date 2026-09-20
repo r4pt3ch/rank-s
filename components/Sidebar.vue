@@ -38,11 +38,21 @@ const navByRole = {
     { to: "/monitor", label: "Lobby monitor" },
     { to: "/account", label: "My account" },
   ],
+  user: [
+    { to: "/", label: "Dashboard" },
+    { to: "/members", label: "Gym members" },
+    { to: "/checkin", label: "Check-in" },
+    { to: "/receipts", label: "Receipts" },
+    { to: "/pos", label: "POS / inventory" },
+    { to: "/reports", label: "Reports" },
+    { to: "/monitor", label: "Lobby monitor" },
+    { to: "/account", label: "My account" },
+  ],
   member: [{ to: "/profile", label: "My profile" }],
 };
 
 const nav = computed(() => navByRole[user.value?.role] || []);
-const roleLabel = computed(() => ({ superadmin: "Super admin", admin: "Regular admin", member: "Gym member" }[user.value?.role]));
+const roleLabel = computed(() => ({ superadmin: "Super admin", admin: "Regular admin", user: "Normal user", member: "Gym member" }[user.value?.role]));
 </script>
 
 <template>
@@ -65,7 +75,7 @@ const roleLabel = computed(() => ({ superadmin: "Super admin", admin: "Regular a
         {{ n.label }}
       </NuxtLink>
     </div>
-    <div v-if="user?.role !== 'member'" style="border-top: 1px solid #1f242c; padding-top: 14px; margin-top: 14px;">
+    <div v-if="user?.role === 'superadmin' || user?.role === 'admin'" style="border-top: 1px solid #1f242c; padding-top: 14px; margin-top: 14px;">
       <a href="/lobby" target="_blank" style="display: block; font-size: 11.5px; color: #5bb8f5; text-decoration: none; margin-bottom: 6px;">Open lobby display ↗</a>
       <a href="/kiosk" target="_blank" style="display: block; font-size: 11.5px; color: #5bb8f5; text-decoration: none; margin-bottom: 6px;">Open self-check-in kiosk ↗</a>
       <a href="/member-login" target="_blank" style="display: block; font-size: 11.5px; color: #5bb8f5; text-decoration: none; margin-bottom: 12px;">Open member account login ↗</a>
