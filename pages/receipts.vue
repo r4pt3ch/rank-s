@@ -28,7 +28,7 @@ async function issue() {
 
 const groupedReceipts = computed(() => {
   const list = (receipts.value || []);
-  const groups: Array<{ name: string; items: any[]; total: number; time: any; issuedBy: string; ids: string[] }> = [];
+  const groups = [];
 
   for (const r of list) {
     // Try to merge a "pos" receipt into the previous "visit" receipt for the same client within 30 minutes
