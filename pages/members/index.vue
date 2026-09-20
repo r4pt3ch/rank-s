@@ -1,13 +1,21 @@
 <script setup>
+const { user } = useAuth();
 const { data: members, refresh } = await useFetch("/api/members");
 const { data: plans } = await useFetch("/api/membership-plans");
 
-const DURATIONS = [
-  { id: "daily",   label: "Daily" },
-  { id: "weekly",  label: "Weekly" },
+const REGULAR_DURATIONS = [
   { id: "monthly", label: "Monthly" },
   { id: "annual",  label: "Annual" },
 ];
+const ELITE_DURATIONS = [
+  { id: "monthly",   label: "Monthly" },
+  { id: "quarterly", label: "3 Months" },
+  { id: "sixmonth",  label: "6 Months" },
+  { id: "annual",    label: "Annual" },
+];
+const availableDurations = computed(() =>
+  membershipForm.value.tier === "elite" ? ELITE_DURATIONS : REGULAR_DURATIONS
+);
 
 const categories = computed(() => {
   const set = new Set((plans.value || []).map((p) => p.category));
@@ -251,6 +259,12 @@ async function saveMembership() {
             @click="resumeFor = editing; editing = null">
             Resume subscription
           </button>
+          <button v-else-if="!editing.membershipPaused && user?.role === 'superadmin'"
+            class="rs-btn-secondary"
+            style="margin-top:10px; width:100%; justify-content:center; color:#f3c44b; border-color:#5a4a14;"
+            @click="pauseFor = editing; editing = null">
+            Pause subscription
+          </button>
         </div>
 
         <button class="rs-btn-primary" style="width: 100%; justify-content: center;" @click="saveEdit">Save changes</button>
@@ -300,15 +314,21 @@ async function saveMembership() {
           Pause reason: {{ membershipFor.membershipPauseReason }}
         </div>
         <div style="display:flex; gap:8px; margin-bottom:14px;">
-          <button v-if="membershipFor.membershipStatus === 'active' || membershipFor.membershipStatus === 'paused'"
+          <button v-if="membershipFor.membershipPaused"
             class="rs-btn-secondary"
-            :style="{ color: membershipFor.membershipPaused ? '#8ee0ab' : '#f3c44b', borderColor: membershipFor.membershipPaused ? '#245a34' : '#5a4a14', fontSize:'11.5px', padding:'5px 10px' }"
-            @click="membershipFor.membershipPaused ? (resumeFor=membershipFor) : (pauseFor=membershipFor)">
-            {{ membershipFor.membershipPaused ? "Resume subscription" : "Pause subscription" }}
+            style="color:#8ee0ab; border-color:#245a34; font-size:11.5px; padding:5px 10px;"
+            @click="resumeFor=membershipFor">
+            Resume subscription
+          </button>
+          <button v-else-if="!membershipFor.membershipPaused && user?.role === 'superadmin'"
+            class="rs-btn-secondary"
+            style="color:#f3c44b; border-color:#5a4a14; font-size:11.5px; padding:5px 10px;"
+            @click="pauseFor=membershipFor">
+            Pause subscription
           </button>
         </div>
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Tier</label>
-        <select v-model="membershipForm.tier" class="rs-input" style="margin-bottom: 14px;">
+        <select v-model="membershipForm.tier" class="rs-input" style="margin-bottom: 14px;" @change="membershipForm.duration = 'monthly'">
           <option value="regular">Regular Member (Rank E–A)</option>
           <option value="elite">Elite Member (Rank S)</option>
         </select>
@@ -323,7 +343,7 @@ async function saveMembership() {
         </div>
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Duration</label>
         <select v-model="membershipForm.duration" class="rs-input" style="margin-bottom: 10px;">
-          <option v-for="d in DURATIONS" :key="d.id" :value="d.id">{{ d.label }}</option>
+          <option v-for="d in availableDurations" :key="d.id" :value="d.id">{{ d.label }}</option>
         </select>
         <div style="font-size: 11.5px; color: #7a8190; margin-bottom: 16px;">
           Setting this starts a new membership period from today. Use this both to assign a first-time membership and to renew an expired one.
