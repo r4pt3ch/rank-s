@@ -141,21 +141,21 @@ async function run() {
   });
 
   await MembershipPlan.create([
-    // Regular Members (Rank E-A) — Student
-    { tier: "regular", studentType: "student", duration: "monthly", price: 900,   dailyFee: 40, weeklyFee: 150 },
-    { tier: "regular", studentType: "student", duration: "annual",  price: 8500,  dailyFee: 40, weeklyFee: 150 },
-
-    // Regular Members (Rank E-A) — Non-student
+    // Regular Members (Rank E-A) — Monthly & Annual, with daily/weekly check-in fees
+    { tier: "regular", studentType: "student",     duration: "monthly", price: 900,   dailyFee: 40, weeklyFee: 150 },
+    { tier: "regular", studentType: "student",     duration: "annual",  price: 8500,  dailyFee: 40, weeklyFee: 150 },
     { tier: "regular", studentType: "non-student", duration: "monthly", price: 1200,  dailyFee: 50, weeklyFee: 200 },
     { tier: "regular", studentType: "non-student", duration: "annual",  price: 11500, dailyFee: 50, weeklyFee: 200 },
 
-    // Elite Members (Rank S) — Student
-    { tier: "elite", studentType: "student", duration: "monthly", price: 1800,  dailyFee: 0, weeklyFee: 0 },
-    { tier: "elite", studentType: "student", duration: "annual",  price: 16000, dailyFee: 0, weeklyFee: 0 },
-
-    // Elite Members (Rank S) — Non-student
-    { tier: "elite", studentType: "non-student", duration: "monthly", price: 2500,  dailyFee: 0, weeklyFee: 0 },
-    { tier: "elite", studentType: "non-student", duration: "annual",  price: 22000, dailyFee: 0, weeklyFee: 0 },
+    // Elite Members (Rank S) — Monthly, 3 Months, 6 Months, Annual — no check-in fee
+    { tier: "elite", studentType: "student",     duration: "monthly",   price: 1800,  dailyFee: 0, weeklyFee: 0 },
+    { tier: "elite", studentType: "student",     duration: "quarterly", price: 4800,  dailyFee: 0, weeklyFee: 0 },
+    { tier: "elite", studentType: "student",     duration: "sixmonth",  price: 9000,  dailyFee: 0, weeklyFee: 0 },
+    { tier: "elite", studentType: "student",     duration: "annual",    price: 16000, dailyFee: 0, weeklyFee: 0 },
+    { tier: "elite", studentType: "non-student", duration: "monthly",   price: 2500,  dailyFee: 0, weeklyFee: 0 },
+    { tier: "elite", studentType: "non-student", duration: "quarterly", price: 6800,  dailyFee: 0, weeklyFee: 0 },
+    { tier: "elite", studentType: "non-student", duration: "sixmonth",  price: 12500, dailyFee: 0, weeklyFee: 0 },
+    { tier: "elite", studentType: "non-student", duration: "annual",    price: 22000, dailyFee: 0, weeklyFee: 0 },
   ]);
 
   await Service.deleteMany({});

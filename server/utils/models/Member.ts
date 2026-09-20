@@ -20,9 +20,16 @@ const MemberSchema = new Schema(
     membershipTier:     { type: String, enum: ["walkin", "regular", "elite", null], default: null },
     membershipCategory: { type: String, default: null },
     membershipStudentType: { type: String, enum: ["student", "non-student", null], default: null },
-    membershipDuration: { type: String, enum: ["monthly", "annual", null], default: null },
+    membershipDuration: { type: String, enum: ["monthly", "quarterly", "sixmonth", "annual", null], default: null },
     membershipStart:    { type: Date, default: null },
     membershipExpiry:   { type: Date, default: null },
+
+    // Subscription pause/resume
+    membershipPaused:       { type: Boolean, default: false },
+    membershipPausedAt:     { type: Date, default: null },
+    membershipPauseReason:  { type: String, default: null },
+    membershipResumedAt:    { type: Date, default: null },
+    membershipPausedDays:   { type: Number, default: 0 }, // cumulative days paused, used to extend expiry on resume
   },
   { timestamps: true }
 );
