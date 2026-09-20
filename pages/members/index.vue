@@ -159,6 +159,7 @@ function openMembership(m) {
     tier: m.membershipTier || m.membershipCategory || "regular",
     studentType: m.membershipStudentType || "non-student",
     duration: m.membershipDuration || "monthly",
+    includeWeeklyPass: false,
   };
   recordSale.value = false;
 }
@@ -173,14 +174,26 @@ const matchedPlan = computed(() => {
 });
 
 async function saveMembership() {
-  const result = await $fetch(`/api/members/${membershipFor.value.id}/membership`, {
+  const memberId = membershipFor.value.id;
+  const includePass = membershipForm.value.includeWeeklyPass && membershipForm.value.tier === "regular";
+
+  const result = await $fetch(`/api/members/${memberId}/membership`, {
     method: "PUT",
     body: { ...membershipForm.value, recordSale: recordSale.value },
   });
+
+  // Issue weekly pass if selected
+  if (includePass) {
+    await $fetch(`/api/members/${memberId}/weekly-pass`, { method: "POST" });
+  }
+
   membershipFor.value = null;
   await refresh();
-  if (result.saleRecorded) {
-    saleConfirmation.value = `Recorded membership sale of ₱${result.saleAmount.toLocaleString()}.`;
+  const parts = [];
+  if (result.saleRecorded) parts.push(`Membership sale ₱${result.saleAmount.toLocaleString()}`);
+  if (includePass) parts.push("Weekly pass issued");
+  if (parts.length) {
+    saleConfirmation.value = parts.join(" · ") + " recorded.";
     setTimeout(() => (saleConfirmation.value = ""), 4000);
   }
 }
@@ -406,7 +419,20 @@ async function saveMembership() {
         </div>
         <div v-if="matchedPlan" style="font-size: 13px; margin-bottom: 12px;">
           Subscription price: <b style="color: #5bb8f5;">₱{{ matchedPlan.price.toLocaleString() }}</b>
+          <span v-if="matchedPlan.weeklyFee && membershipForm.tier === 'regular'" style="color:#7a8190; font-size:12px; margin-left:6px;">· Weekly pass: ₱{{ matchedPlan.weeklyFee.toLocaleString() }}</span>
         </div>
+
+        <!-- Optional weekly pass for Regular Members -->
+        <div v-if="membershipForm.tier === 'regular' && matchedPlan?.weeklyFee" style="background:#0d0f12; border:1px solid #2a2f38; border-radius:10px; padding:12px; margin-bottom:14px;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" v-model="membershipForm.includeWeeklyPass" style="width:16px; height:16px;" />
+            <div>
+              <div style="font-size:12.5px; font-weight:600;">Include Weekly Pass</div>
+              <div style="font-size:11.5px; color:#7a8190; margin-top:2px;">Grants free check-ins for 7 days — ₱{{ matchedPlan.weeklyFee.toLocaleString() }} additional charge</div>
+            </div>
+          </label>
+        </div>
+
         <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; cursor: pointer;">
           <input type="checkbox" v-model="recordSale" style="width: 16px; height: 16px;" />
           <span style="font-size: 12.5px; color: #aab0bb;">Record this as a paid sale in Reports</span>
