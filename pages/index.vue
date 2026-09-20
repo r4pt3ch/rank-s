@@ -96,12 +96,22 @@ async function resetDashboard() {
       <div v-if="activityCleared" style="font-size: 13px; color: #5d6470; padding: 18px 0; text-align: center;">Display cleared. Today's check-ins are still recorded — see Reports for the full log.</div>
       <template v-else>
         <div v-if="!checkins?.length" style="font-size: 13px; color: #5d6470; padding: 18px 0; text-align: center;">No check-ins yet today.</div>
-        <div v-for="c in (checkins || []).slice(0, 8)" :key="c.id" class="rs-row">
-          <span style="font-size: 13.5px; font-weight: 600;">{{ c.name }}</span>
-          <span style="font-size: 12px; color: #7a8190;">{{ new Date(c.time).toLocaleTimeString() }}</span>
-          <RankBadge v-if="c.rank" :rank="c.rank" size="sm" />
-          <span v-else style="font-size: 11.5px; color: #7a8190;">Walk-in</span>
-        </div>
+        <template v-else>
+          <div style="display: grid; grid-template-columns: 1fr 110px 80px 70px; gap: 8px; padding: 7px 0; font-size: 11px; color: #5d6470; border-bottom: 1px solid #1c2026;">
+            <span>Name</span><span>Time</span><span style="text-align:center;">Type</span><span style="text-align:right;">Fee</span>
+          </div>
+          <div v-for="c in (checkins || []).slice(0, 8)" :key="c.id"
+            style="display: grid; grid-template-columns: 1fr 110px 80px 70px; gap: 8px; align-items: center; padding: 9px 0; border-bottom: 1px solid #1c2026;"
+            :style="{ opacity: c.voided ? 0.4 : 1 }">
+            <span style="font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.name }}</span>
+            <span style="font-size: 12px; color: #7a8190;">{{ new Date(c.time).toLocaleTimeString() }}</span>
+            <div style="display:flex; justify-content:center;">
+              <RankBadge v-if="c.rank" :rank="c.rank" size="sm" />
+              <span v-else style="font-size: 11px; color: #f3a8a8; border: 1px solid #5a2424; border-radius: 4px; padding: 2px 5px;">Walk-in</span>
+            </div>
+            <span style="font-size: 12.5px; color: #5bb8f5; text-align: right;">{{ c.fee ? `₱${c.fee}` : '—' }}</span>
+          </div>
+        </template>
       </template>
     </div>
   </div>
