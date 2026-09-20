@@ -12,6 +12,7 @@ const views = [
   { id: "checkin",    label: "Check-in sales" },
   { id: "inventory",  label: "Inventory & services" },
   { id: "membership", label: "Membership sales" },
+  { id: "registered", label: "Registered members" },
 ];
 const periods = [
   { id: "daily",   label: "Daily" },
@@ -152,10 +153,35 @@ function exportSummary() {
   downloadCSV(`rank-s-summary-${periodSlug()}.csv`, rows);
 }
 
+function exportRegistered() {
+  if (!data.value) return;
+  const r = data.value.registeredMembers;
+  const rows = [
+    ["Rank S — Registered Members", period.value, rangeLabel.value],
+    [],
+    ["New registrations", r.totalNew],
+    ["Membership purchases", r.totalMembershipPurchases],
+    ["Membership revenue", r.membershipPurchaseRevenue],
+    [],
+    ["Month", "New members"],
+    ...r.byMonth.map((b) => [b.month, b.count]),
+    [],
+    ["New members detail"],
+    ["Name", "Tier", "Date"],
+    ...r.byMonth.flatMap((b) => b.members.map((m) => [m.name, m.tier || "—", m.date])),
+    [],
+    ["Successive membership purchases"],
+    ["Name", "Plan", "Amount", "Date"],
+    ...r.membershipPurchases.map((p) => [p.name, p.item, p.amount, p.date]),
+  ];
+  downloadCSV(`rank-s-registered-members-${periodSlug()}.csv`, rows);
+}
+
 function exportCurrent() {
   if (view.value === "goers") exportGoers();
   else if (view.value === "checkin") exportCheckin();
   else if (view.value === "inventory") exportInventory();
+  else if (view.value === "registered") exportRegistered();
   else exportMembership();
 }
 
@@ -343,6 +369,44 @@ const grandTotal = computed(() => {
           <span style="font-weight: 600; font-size: 13px;">{{ p.name }}</span>
           <span style="font-size: 12.5px;">{{ p.count }}</span>
           <span style="font-size: 12.5px;">₱{{ p.revenue.toLocaleString() }}</span>
+        </div>
+      </div>
+    </template>
+    <!-- Registered members view -->
+    <template v-else-if="data && !pending && view === 'registered'">
+      <p style="font-size: 12.5px; color: #5d6470; margin: -8px 0 16px;">New member registrations and successive membership purchases in the selected period.</p>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px;">
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">New registrations</div><div style="font-size: 24px; font-weight: 800;">{{ data.registeredMembers.totalNew }}</div></div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Membership purchases</div><div style="font-size: 24px; font-weight: 800;">{{ data.registeredMembers.totalMembershipPurchases }}</div></div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Membership revenue</div><div style="font-size: 24px; font-weight: 800;">₱{{ data.registeredMembers.membershipPurchaseRevenue.toLocaleString() }}</div></div>
+      </div>
+
+      <!-- By month breakdown -->
+      <div class="rs-card" style="padding: 0; margin-bottom: 18px;">
+        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">New registrations by month</div>
+        <div v-if="!data.registeredMembers.byMonth.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No new registrations in this period.</div>
+        <div v-for="b in data.registeredMembers.byMonth" :key="b.month">
+          <div style="display: grid; grid-template-columns: 100px 60px 1fr; gap: 10px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+            <span style="font-size: 13px; font-weight: 600; color: #5bb8f5;">{{ b.month }}</span>
+            <span style="font-size: 13px; font-weight: 700;">{{ b.count }}</span>
+            <span style="font-size: 12px; color: #7a8190;">{{ b.members.map(m => m.name).join(", ") }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Successive membership purchases -->
+      <div class="rs-card" style="padding: 0;">
+        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">Successive membership purchases</div>
+        <div style="display: grid; grid-template-columns: 1fr 2fr 80px 100px; gap: 8px; padding: 10px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
+          <span>Member</span><span>Plan</span><span>Amount</span><span>Date</span>
+        </div>
+        <div v-if="!data.registeredMembers.membershipPurchases.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No membership purchases in this period.</div>
+        <div v-for="(p, i) in data.registeredMembers.membershipPurchases" :key="i"
+          style="display: grid; grid-template-columns: 1fr 2fr 80px 100px; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+          <span style="font-weight: 600; font-size: 13px;">{{ p.name }}</span>
+          <span style="font-size: 12px; color: #aab0bb;">{{ p.item }}</span>
+          <span style="font-size: 12.5px; color: #5bb8f5;">₱{{ p.amount.toLocaleString() }}</span>
+          <span style="font-size: 12px; color: #7a8190;">{{ p.date }}</span>
         </div>
       </div>
     </template>

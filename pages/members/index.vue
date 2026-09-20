@@ -225,6 +225,7 @@ async function saveMembership() {
             {{ m.email }} · PIN {{ m.pin }} · {{ m.points }} pts ·
             <span :style="{ color: statusColor(m) }">{{ statusLabel(m) }}</span>
             <span v-if="m.weeklyPassExpiry && new Date(m.weeklyPassExpiry) > new Date()" style="color:#8ee0ab; margin-left:4px;">· Weekly pass (until {{ formatDate(m.weeklyPassExpiry) }})</span>
+            · Joined {{ formatDate(m.joinDate || m.createdAt) }}
           </div>
         </div>
         <RankBadge :rank="m.rank" />
