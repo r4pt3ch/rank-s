@@ -29,7 +29,8 @@ const MemberSchema = new Schema(
     membershipPausedAt:     { type: Date, default: null },
     membershipPauseReason:  { type: String, default: null },
     membershipResumedAt:    { type: Date, default: null },
-    membershipPausedDays:   { type: Number, default: 0 }, // cumulative days paused, used to extend expiry on resume
+    membershipPausedDays:   { type: Number, default: 0 },
+    weeklyPassExpiry:       { type: Date, default: null }, // set when a weekly pass is purchased; nil = no active pass // cumulative days paused, used to extend expiry on resume
   },
   { timestamps: true }
 );

@@ -37,6 +37,7 @@ export default defineEventHandler(async (event) => {
       membershipPausedAt: m.membershipPausedAt || null,
       membershipPauseReason: m.membershipPauseReason || null,
       membershipResumedAt: m.membershipResumedAt || null,
+      weeklyPassExpiry: m.weeklyPassExpiry || null,
     }));
   }
 

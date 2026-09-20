@@ -45,7 +45,6 @@ export default defineEventHandler(async (event) => {
       pin: body.pin,
       walkinName: body.name,
       walkinStudentType: body.studentType || "non-student",
-      visitType: body.visitType || "daily",
       issuedBy: user,
       source: "staff",
     });

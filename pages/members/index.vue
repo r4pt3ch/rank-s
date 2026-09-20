@@ -30,6 +30,15 @@ const membershipFor = ref(null);
 const membershipForm = ref({ category: "", duration: "monthly" });
 const recordSale = ref(false);
 const saleConfirmation = ref("");
+const weeklyPassFor = ref(null);
+const weeklyPassDone = ref(false);
+
+async function issueWeeklyPass() {
+  const result = await $fetch(`/api/members/${weeklyPassFor.value.id}/weekly-pass`, { method: "POST" });
+  weeklyPassDone.value = true;
+  await refresh();
+  setTimeout(() => { weeklyPassFor.value = null; weeklyPassDone.value = false; }, 2000);
+}
 
 // Pause / Resume
 const pauseFor = ref(null);
@@ -171,9 +180,11 @@ async function saveMembership() {
           <div style="font-size: 11.5px; color: #7a8190;">
             {{ m.email }} · PIN {{ m.pin }} · {{ m.points }} pts ·
             <span :style="{ color: statusColor(m) }">{{ statusLabel(m) }}</span>
+            <span v-if="m.weeklyPassExpiry && new Date(m.weeklyPassExpiry) > new Date()" style="color:#8ee0ab; margin-left:4px;">· Weekly pass (until {{ formatDate(m.weeklyPassExpiry) }})</span>
           </div>
         </div>
         <RankBadge :rank="m.rank" />
+        <button v-if="m.membershipTier === 'regular' || m.membershipCategory === 'regular'" class="rs-btn-secondary" style="font-size:11.5px; padding:4px 8px;" @click="weeklyPassFor=m">Pass</button>
         <button class="rs-btn-secondary" @click="openMembership(m)">Membership</button>
         <button class="rs-btn-secondary" @click="idCardFor = m">ID card</button>
         <button class="rs-btn-secondary" @click="startEdit(m)">Edit</button>
@@ -356,6 +367,28 @@ async function saveMembership() {
           <span style="font-size: 12.5px; color: #aab0bb;">Record this as a paid sale in Reports</span>
         </label>
         <button class="rs-btn-primary" style="width: 100%; justify-content: center;" @click="saveMembership">Save membership</button>
+      </div>
+    </div>
+
+    <!-- Weekly pass modal -->
+    <div v-if="weeklyPassFor" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:60;">
+      <div style="width:380px;background:#13161b;border:1px solid #232730;border-radius:14px;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-weight:800;font-size:16px;">Issue Weekly Pass</div>
+          <button @click="weeklyPassFor=null;weeklyPassDone=false" style="background:transparent;border:none;color:#8a909b;cursor:pointer;">✕</button>
+        </div>
+        <div v-if="weeklyPassDone" style="padding:16px;background:#142a1e;border:1px solid #245a34;border-radius:10px;text-align:center;font-size:13px;color:#8ee0ab;">
+          Weekly pass issued — valid for 7 days!
+        </div>
+        <template v-else>
+          <p style="font-size:13px;color:#aab0bb;margin:0 0 14px;">
+            Issue a 7-day weekly pass to <b>{{ weeklyPassFor.name }}</b>. While active, check-ins will not charge the daily fee. The weekly pass fee will be recorded as a sale.
+          </p>
+          <div style="display:flex;gap:8px;">
+            <button class="rs-btn-secondary" style="flex:1;justify-content:center;" @click="weeklyPassFor=null">Cancel</button>
+            <button class="rs-btn-primary" style="flex:1;justify-content:center;" @click="issueWeeklyPass">Issue pass</button>
+          </div>
+        </template>
       </div>
     </div>
 

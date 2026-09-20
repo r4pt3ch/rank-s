@@ -3,12 +3,13 @@ const { data: members } = await useFetch("/api/members");
 const { data: checkins, refresh } = await useFetch("/api/checkins", { query: { today: "1" } });
 const { data: allServices } = await useFetch("/api/services");
 
-const tab = ref("member");
+const tab = ref("walkin"); // default to walk-in tab
 const search = ref("");
 const pinInput = ref("");
 const walkinName = ref("");
 const walkinStudentType = ref("non-student");
-const visitType = ref("daily");
+const weeklyPassFor = ref(null);
+const weeklyPassResult = ref(null);
 const logSearch = ref("");
 
 const filteredLog = computed(() => {
@@ -72,8 +73,8 @@ async function addServices() {
 
 async function checkInMember(member) {
   try {
-    const result = await $fetch("/api/checkins", { method: "POST", body: { memberId: member.id, visitType: visitType.value } });
-    feedback.value = { ok: true, text: `${result.name} checked in (${visitType.value}).${result.leveledUp ? ` Leveled up to ${result.rank}!` : ""}${feeText(result)}` };
+    const result = await $fetch("/api/checkins", { method: "POST", body: { memberId: member.id } });
+    feedback.value = { ok: true, text: `${result.name} checked in.${result.leveledUp ? ` Leveled up to ${result.rank}!` : ""}${feeText(result)}` };
     search.value = "";
     await refresh();
     openServicesModal(result.id, result.name);
@@ -84,8 +85,8 @@ async function checkInMember(member) {
 
 async function checkInByPin() {
   try {
-    const result = await $fetch("/api/checkins", { method: "POST", body: { pin: pinInput.value, visitType: visitType.value } });
-    feedback.value = { ok: true, text: `${result.name} checked in (${visitType.value}).${result.leveledUp ? ` Leveled up to ${result.rank}!` : ""}${feeText(result)}` };
+    const result = await $fetch("/api/checkins", { method: "POST", body: { pin: pinInput.value } });
+    feedback.value = { ok: true, text: `${result.name} checked in.${result.leveledUp ? ` Leveled up to ${result.rank}!` : ""}${feeText(result)}` };
     pinInput.value = "";
     await refresh();
     openServicesModal(result.id, result.name);
@@ -146,6 +147,16 @@ async function reviewVoid(action) {
 function reopenServices(c) {
   openServicesModal(c.id, c.name);
 }
+
+async function purchaseWeeklyPass() {
+  const result = await $fetch(`/api/members/${weeklyPassFor.value.id}/weekly-pass`, { method: "POST" });
+  weeklyPassResult.value = result;
+  await refresh();
+  setTimeout(() => {
+    weeklyPassFor.value = null;
+    weeklyPassResult.value = null;
+  }, 2000);
+}
 </script>
 
 <template>
@@ -167,22 +178,15 @@ function reopenServices(c) {
 
         <!-- Member tab -->
         <template v-if="tab === 'member'">
-          <div style="margin-bottom:14px;">
-            <div style="font-size:12px; color:#9aa1ab; margin-bottom:6px;">Visit type</div>
-            <div style="display:flex; gap:8px;">
-              <button class="rs-btn-secondary" style="flex:1; justify-content:center; font-size:12.5px;"
-                :style="{ background: visitType==='daily' ? '#1c2128':'transparent', color: visitType==='daily' ? '#5bb8f5':'#aab0bb', borderColor: visitType==='daily' ? '#2f8fd6':'#2a2f38' }"
-                @click="visitType='daily'">Daily check-in</button>
-              <button class="rs-btn-secondary" style="flex:1; justify-content:center; font-size:12.5px;"
-                :style="{ background: visitType==='weekly' ? '#1c2128':'transparent', color: visitType==='weekly' ? '#5bb8f5':'#aab0bb', borderColor: visitType==='weekly' ? '#2f8fd6':'#2a2f38' }"
-                @click="visitType='weekly'">Weekly check-in</button>
-            </div>
-          </div>
           <div style="font-weight: 700; font-size: 13px; margin-bottom: 10px; color: #aab0bb;">Search by name</div>
           <input v-model="search" class="rs-input" placeholder="Search member name..." style="margin-bottom: 10px;" />
           <div v-for="m in matches" :key="m.id" class="rs-row">
-            <span style="font-size: 13.5px; font-weight: 600;">{{ m.name }}</span>
+            <div style="flex:1;">
+              <span style="font-size: 13.5px; font-weight: 600;">{{ m.name }}</span>
+              <span v-if="m.weeklyPassExpiry && new Date(m.weeklyPassExpiry) > new Date()" style="font-size:10px; color:#8ee0ab; border:1px solid #245a34; border-radius:4px; padding:1px 5px; margin-left:6px;">Weekly pass</span>
+            </div>
             <RankBadge :rank="m.rank" size="sm" />
+            <button class="rs-btn-secondary" style="font-size:11.5px; padding:4px 8px;" @click="weeklyPassFor=m">Pass</button>
             <button class="rs-btn-secondary" @click="checkInMember(m)">Check in</button>
           </div>
           <div style="border-top: 1px solid #1c2026; margin-top: 16px; padding-top: 16px;">
@@ -313,6 +317,28 @@ function reopenServices(c) {
           <button class="rs-btn-secondary" style="flex:1;justify-content:center;color:#e88;border-color:#5a2424;" @click="reviewVoid('reject')">Reject</button>
           <button class="rs-btn-primary" style="flex:1;justify-content:center;" @click="reviewVoid('approve')">Approve void</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Weekly pass modal -->
+    <div v-if="weeklyPassFor" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:60;">
+      <div style="width:380px;background:#13161b;border:1px solid #232730;border-radius:14px;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-weight:800;font-size:16px;">Weekly Pass</div>
+          <button @click="weeklyPassFor=null;weeklyPassResult=null" style="background:transparent;border:none;color:#8a909b;cursor:pointer;">✕</button>
+        </div>
+        <div v-if="weeklyPassResult" style="padding:16px;background:#142a1e;border:1px solid #245a34;border-radius:10px;text-align:center;font-size:13px;color:#8ee0ab;">
+          Weekly pass issued! Valid for 7 days.<span v-if="weeklyPassResult.weeklyFee"> Fee: ₱{{ weeklyPassResult.weeklyFee }}</span>
+        </div>
+        <template v-else>
+          <p style="font-size:13px;color:#aab0bb;margin:0 0 14px;">
+            Issue a 7-day weekly pass to <b>{{ weeklyPassFor.name }}</b>. While the pass is active, check-ins will not charge the daily fee.
+          </p>
+          <div style="display:flex;gap:8px;">
+            <button class="rs-btn-secondary" style="flex:1;justify-content:center;" @click="weeklyPassFor=null">Cancel</button>
+            <button class="rs-btn-primary" style="flex:1;justify-content:center;" @click="purchaseWeeklyPass">Issue pass</button>
+          </div>
+        </template>
       </div>
     </div>
 
