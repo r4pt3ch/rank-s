@@ -1,12 +1,18 @@
 <script setup>
 const { data, refresh } = await useFetch("/api/settings");
-const pointsPerCheckIn = ref(data.value?.pointsPerCheckIn ?? 20);
-const walkInFeeStudent = ref(data.value?.walkInFeeStudent ?? 40);
+const { data: receiptData } = await useFetch("/api/receipt-settings");
+
+// Gym settings
+const pointsPerCheckIn    = ref(data.value?.pointsPerCheckIn ?? 20);
+const walkInFeeStudent    = ref(data.value?.walkInFeeStudent ?? 40);
 const walkInFeeNonStudent = ref(data.value?.walkInFeeNonStudent ?? 60);
 const lobbyAutoClearEnabled = ref(data.value?.lobbyAutoClearEnabled ?? false);
-const lobbyDisplayMinutes = ref(data.value?.lobbyDisplayMinutes ?? 60);
+const lobbyDisplayMinutes   = ref(data.value?.lobbyDisplayMinutes ?? 60);
 
-const saved = ref(false);
+// Receipt settings
+const form = ref({ ...receiptData.value });
+
+const saved = ref("");
 const error = ref("");
 const clearing = ref(false);
 const cleared = ref(false);
@@ -14,19 +20,7 @@ const clearingReports = ref(false);
 const reportsCleared = ref(false);
 const confirmClearReports = ref(false);
 
-async function clearReportsData() {
-  clearingReports.value = true;
-  try {
-    const result = await $fetch("/api/clear-reports", { method: "POST" });
-    reportsCleared.value = true;
-    confirmClearReports.value = false;
-    setTimeout(() => (reportsCleared.value = false), 4000);
-  } finally {
-    clearingReports.value = false;
-  }
-}
-
-async function save() {
+async function saveGym() {
   error.value = "";
   try {
     await $fetch("/api/settings", {
@@ -39,11 +33,18 @@ async function save() {
         lobbyDisplayMinutes: lobbyDisplayMinutes.value,
       },
     });
-    saved.value = true;
-    setTimeout(() => (saved.value = false), 2000);
-  } catch (e) {
-    error.value = e.data?.statusMessage || "Could not save settings.";
-  }
+    saved.value = "gym";
+    setTimeout(() => (saved.value = ""), 2000);
+  } catch (e) { error.value = e.data?.statusMessage || "Could not save."; }
+}
+
+async function saveReceipt() {
+  error.value = "";
+  try {
+    await $fetch("/api/receipt-settings", { method: "PUT", body: form.value });
+    saved.value = "receipt";
+    setTimeout(() => (saved.value = ""), 2000);
+  } catch (e) { error.value = e.data?.statusMessage || "Could not save."; }
 }
 
 async function clearLobbyNow() {
@@ -53,70 +54,114 @@ async function clearLobbyNow() {
     cleared.value = true;
     await refresh();
     setTimeout(() => (cleared.value = false), 2500);
-  } finally {
-    clearing.value = false;
-  }
+  } finally { clearing.value = false; }
 }
+
+async function clearReportsData() {
+  clearingReports.value = true;
+  try {
+    await $fetch("/api/clear-reports", { method: "POST" });
+    reportsCleared.value = true;
+    confirmClearReports.value = false;
+    setTimeout(() => (reportsCleared.value = false), 4000);
+  } finally { clearingReports.value = false; }
+}
+
+const receiptToggles = [
+  { key: "showLogo",         label: "Gym logo" },
+  { key: "showAddress",      label: "Address" },
+  { key: "showPhone",        label: "Phone number" },
+  { key: "showReceiptNumber",label: "Receipt number" },
+  { key: "showDateTime",     label: "Date and time" },
+  { key: "showCashier",      label: "Cashier name" },
+  { key: "showItemizedList", label: "Itemized list" },
+  { key: "showFooterMessage",label: "Footer message" },
+];
 </script>
 
 <template>
   <div>
     <h1 style="font-size: 22px; font-weight: 800; margin: 0;">Settings</h1>
-    <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 24px;">Configure gym-wide behavior.</p>
+    <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 24px;">Gym-wide configuration and receipt printing options.</p>
 
-    <div class="rs-card" style="max-width: 460px; margin-bottom: 18px;">
+    <!-- Section: Gym settings -->
+    <div style="font-size: 11px; font-weight: 700; color: #5d6470; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;">Gym settings</div>
+    <div class="rs-card" style="max-width: 500px; margin-bottom: 18px;">
       <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">Points per check-in</div>
-      <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 14px;">How many points a gym member earns every time they check in.</p>
+      <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 10px;">Points earned by a member each time they check in.</p>
       <input v-model.number="pointsPerCheckIn" type="number" min="0" class="rs-input" style="margin-bottom: 20px;" />
 
       <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">Walk-in entrance fees</div>
-      <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 14px;">
-        Separate rates for student and non-student walk-ins. Also applied to members with an expired membership until they renew.
-      </p>
-      <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Student walk-in fee (₱)</label>
-      <input v-model.number="walkInFeeStudent" type="number" min="0" class="rs-input" style="margin-bottom: 14px;" />
-      <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Non-student walk-in fee (₱)</label>
-      <input v-model.number="walkInFeeNonStudent" type="number" min="0" class="rs-input" style="margin-bottom: 16px;" />
-
-      <div v-if="error" style="color: #e36b6b; font-size: 12.5px; margin-bottom: 12px;">{{ error }}</div>
-      <button class="rs-btn-primary" style="width: 100%; justify-content: center;" @click="save">Save settings</button>
-      <div v-if="saved" style="margin-top: 10px; font-size: 12.5px; color: #8ee0ab; text-align: center;">Settings saved.</div>
-    </div>
-
-    <div class="rs-card" style="max-width: 460px;">
-      <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">Lobby display</div>
-      <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 16px;">
-        Control how long check-ins stay visible on the public lobby board (<code>/lobby</code>), and clear it on demand.
-      </p>
-      <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px; cursor: pointer;">
-        <input type="checkbox" v-model="lobbyAutoClearEnabled" style="width: 16px; height: 16px;" />
-        <span style="font-size: 13px;">Automatically clear old check-ins from the board</span>
-      </label>
-      <div v-if="lobbyAutoClearEnabled" style="margin-bottom: 16px;">
-        <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Display duration (minutes)</label>
-        <input v-model.number="lobbyDisplayMinutes" type="number" min="1" class="rs-input" />
-        <div style="font-size: 11.5px; color: #5d6470; margin-top: 6px;">Check-ins older than this disappear from the lobby board automatically. They stay in Reports regardless.</div>
+      <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 12px;">Applied to walk-ins and members with an expired subscription until they renew.</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+        <div>
+          <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Student (₱)</label>
+          <input v-model.number="walkInFeeStudent" type="number" min="0" class="rs-input" />
+        </div>
+        <div>
+          <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Non-student (₱)</label>
+          <input v-model.number="walkInFeeNonStudent" type="number" min="0" class="rs-input" />
+        </div>
       </div>
-      <button class="rs-btn-primary" style="width: 100%; justify-content: center; margin-bottom: 16px;" @click="save">Save settings</button>
-      <div style="border-top: 1px solid #1c2026; padding-top: 16px;">
-        <div style="font-size: 12.5px; color: #8a909b; margin-bottom: 10px;">Clear the lobby board right now. This doesn't delete any check-in records.</div>
-        <button class="rs-btn-secondary" style="width: 100%; justify-content: center;" :disabled="clearing" @click="clearLobbyNow">
+
+      <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">Lobby display</div>
+      <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 12px;">How long check-ins stay on the public board (<code>/lobby</code>).</p>
+      <label style="display:flex; align-items:center; gap:10px; margin-bottom:12px; cursor:pointer;">
+        <input type="checkbox" v-model="lobbyAutoClearEnabled" style="width:16px; height:16px;" />
+        <span style="font-size:13px;">Auto-clear old check-ins from the lobby board</span>
+      </label>
+      <div v-if="lobbyAutoClearEnabled" style="margin-bottom:16px;">
+        <label style="font-size:12px; color:#9aa1ab; display:block; margin-bottom:6px;">Display duration (minutes)</label>
+        <input v-model.number="lobbyDisplayMinutes" type="number" min="1" class="rs-input" />
+        <div style="font-size:11.5px; color:#5d6470; margin-top:6px;">Check-ins older than this disappear automatically. They stay in Reports.</div>
+      </div>
+
+      <div v-if="error" style="color:#e36b6b; font-size:12.5px; margin-bottom:10px;">{{ error }}</div>
+      <button class="rs-btn-primary" style="width:100%; justify-content:center;" @click="saveGym">Save gym settings</button>
+      <div v-if="saved === 'gym'" style="margin-top:10px; font-size:12.5px; color:#8ee0ab; text-align:center;">Settings saved.</div>
+
+      <div style="border-top:1px solid #1c2026; padding-top:14px; margin-top:18px;">
+        <div style="font-size:12.5px; color:#8a909b; margin-bottom:10px;">Clear the lobby board immediately without deleting any records.</div>
+        <button class="rs-btn-secondary" style="width:100%; justify-content:center;" :disabled="clearing" @click="clearLobbyNow">
           {{ clearing ? "Clearing..." : "Clear lobby display now" }}
         </button>
-        <div v-if="cleared" style="margin-top: 10px; font-size: 12.5px; color: #8ee0ab; text-align: center;">Lobby display cleared.</div>
+        <div v-if="cleared" style="margin-top:10px; font-size:12.5px; color:#8ee0ab; text-align:center;">Lobby display cleared.</div>
       </div>
     </div>
 
-    <div class="rs-card" style="max-width: 460px; border-color: #5a2424;">
+    <!-- Section: Receipt settings -->
+    <div style="font-size: 11px; font-weight: 700; color: #5d6470; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;">Receipt settings</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; max-width: 760px; margin-bottom: 18px;">
+      <div class="rs-card">
+        <div style="font-weight: 700; font-size: 14px; margin-bottom: 14px;">Gym details</div>
+        <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Gym name</label>
+        <input v-model="form.gymName" class="rs-input" style="margin-bottom: 14px;" />
+        <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Address</label>
+        <input v-model="form.address" class="rs-input" style="margin-bottom: 14px;" />
+        <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Phone</label>
+        <input v-model="form.phone" class="rs-input" style="margin-bottom: 14px;" />
+        <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Footer message</label>
+        <input v-model="form.footerMessage" class="rs-input" placeholder="Thank you for training with us!" />
+      </div>
+      <div class="rs-card">
+        <div style="font-weight: 700; font-size: 14px; margin-bottom: 14px;">What to print</div>
+        <div v-for="t in receiptToggles" :key="t.key" class="rs-row">
+          <span style="font-size:13px;">{{ t.label }}</span>
+          <input type="checkbox" v-model="form[t.key]" style="width:16px; height:16px;" />
+        </div>
+        <button class="rs-btn-primary" style="width:100%; justify-content:center; margin-top:16px;" @click="saveReceipt">Save receipt settings</button>
+        <div v-if="saved === 'receipt'" style="margin-top:10px; font-size:12.5px; color:#8ee0ab; text-align:center;">Receipt settings saved.</div>
+      </div>
+    </div>
+
+    <!-- Section: Danger zone -->
+    <div style="font-size: 11px; font-weight: 700; color: #5d6470; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;">Danger zone</div>
+    <div class="rs-card" style="max-width: 500px; border-color: #5a2424;">
       <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #e88;">Clear report data</div>
-      <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 16px;">
-        Permanently deletes all check-in records and receipts from the database. This cannot be undone. Member accounts, membership plans, and settings are not affected.
-      </p>
-      <div v-if="reportsCleared" style="font-size: 13px; color: #8ee0ab; margin-bottom: 12px;">All report data has been cleared.</div>
+      <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 16px;">Permanently deletes all check-in records and receipts. Cannot be undone. Member accounts, plans, and settings are not affected.</p>
+      <div v-if="reportsCleared" style="font-size:13px; color:#8ee0ab; margin-bottom:12px;">All report data has been cleared.</div>
       <template v-if="!confirmClearReports">
-        <button class="rs-btn-secondary" style="width:100%; justify-content:center; color:#e88; border-color:#5a2424;" @click="confirmClearReports=true">
-          Clear all report data
-        </button>
+        <button class="rs-btn-secondary" style="width:100%; justify-content:center; color:#e88; border-color:#5a2424;" @click="confirmClearReports=true">Clear all report data</button>
       </template>
       <template v-else>
         <div style="font-size:13px; color:#e88; font-weight:600; margin-bottom:12px;">Are you sure? This will permanently delete all check-ins and receipts.</div>

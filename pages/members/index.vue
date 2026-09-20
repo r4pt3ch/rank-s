@@ -155,11 +155,14 @@ async function resetCredentials(id) {
 
 function openMembership(m) {
   membershipFor.value = m;
+  const today = new Date().toISOString().slice(0, 10);
   membershipForm.value = {
     tier: m.membershipTier || m.membershipCategory || "regular",
     studentType: m.membershipStudentType || "non-student",
     duration: m.membershipDuration || "monthly",
     includeWeeklyPass: false,
+    startDate: today,
+    backdated: false,
   };
   recordSale.value = false;
 }
@@ -179,7 +182,7 @@ async function saveMembership() {
 
   const result = await $fetch(`/api/members/${memberId}/membership`, {
     method: "PUT",
-    body: { ...membershipForm.value, recordSale: recordSale.value },
+    body: { ...membershipForm.value, start: membershipForm.value.startDate || undefined, recordSale: recordSale.value },
   });
 
   // Issue weekly pass if selected
@@ -417,6 +420,15 @@ async function saveMembership() {
         <div style="font-size: 11.5px; color: #7a8190; margin-bottom: 16px;">
           Setting this starts a new membership period from today. Use this both to assign a first-time membership and to renew an expired one.
         </div>
+
+        <!-- Start date -->
+        <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Subscription start date</label>
+        <input v-model="membershipForm.startDate" type="date" class="rs-input" style="margin-bottom: 10px;" />
+        <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px; cursor:pointer;">
+          <input type="checkbox" v-model="membershipForm.backdated" style="width:16px; height:16px;"
+            @change="membershipForm.backdated && (membershipForm.startDate = '')" />
+          <span style="font-size:12.5px; color:#aab0bb;">Registered before system — enter start date manually above</span>
+        </label>
         <div v-if="matchedPlan" style="font-size: 13px; margin-bottom: 12px;">
           Subscription price: <b style="color: #5bb8f5;">₱{{ matchedPlan.price.toLocaleString() }}</b>
           <span v-if="matchedPlan.weeklyFee && membershipForm.tier === 'regular'" style="color:#7a8190; font-size:12px; margin-left:6px;">· Weekly pass: ₱{{ matchedPlan.weeklyFee.toLocaleString() }}</span>
