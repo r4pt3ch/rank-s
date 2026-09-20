@@ -142,30 +142,24 @@ async function run() {
 
   await MembershipPlan.create([
     // Regular Members (Rank E-A) — Student
-    { tier: "regular", studentType: "student", duration: "daily",     price: 50,    visitFee: 50   },
-    { tier: "regular", studentType: "student", duration: "monthly",   price: 900,   visitFee: 40   },
-    { tier: "regular", studentType: "student", duration: "quarterly", price: 2400,  visitFee: 40   },
-    { tier: "regular", studentType: "student", duration: "sixmonth",  price: 4500,  visitFee: 40   },
-    { tier: "regular", studentType: "student", duration: "yearly",    price: 8500,  visitFee: 40   },
+    { tier: "regular", studentType: "student", duration: "daily",   price: 50,    visitFee: 50 },
+    { tier: "regular", studentType: "student", duration: "weekly",  price: 300,   visitFee: 40 },
+    { tier: "regular", studentType: "student", duration: "monthly", price: 900,   visitFee: 40 },
+    { tier: "regular", studentType: "student", duration: "annual",  price: 8500,  visitFee: 40 },
 
     // Regular Members (Rank E-A) — Non-student
-    { tier: "regular", studentType: "non-student", duration: "daily",     price: 60,    visitFee: 60   },
-    { tier: "regular", studentType: "non-student", duration: "monthly",   price: 1200,  visitFee: 50   },
-    { tier: "regular", studentType: "non-student", duration: "quarterly", price: 3300,  visitFee: 50   },
-    { tier: "regular", studentType: "non-student", duration: "sixmonth",  price: 6300,  visitFee: 50   },
-    { tier: "regular", studentType: "non-student", duration: "yearly",    price: 11500, visitFee: 50   },
+    { tier: "regular", studentType: "non-student", duration: "daily",   price: 60,    visitFee: 60 },
+    { tier: "regular", studentType: "non-student", duration: "weekly",  price: 380,   visitFee: 50 },
+    { tier: "regular", studentType: "non-student", duration: "monthly", price: 1200,  visitFee: 50 },
+    { tier: "regular", studentType: "non-student", duration: "annual",  price: 11500, visitFee: 50 },
 
     // Elite Members (Rank S) — Student
-    { tier: "elite", studentType: "student", duration: "monthly",   price: 1800,  visitFee: 0 },
-    { tier: "elite", studentType: "student", duration: "quarterly", price: 4800,  visitFee: 0 },
-    { tier: "elite", studentType: "student", duration: "sixmonth",  price: 9000,  visitFee: 0 },
-    { tier: "elite", studentType: "student", duration: "yearly",    price: 16000, visitFee: 0 },
+    { tier: "elite", studentType: "student", duration: "monthly", price: 1800,  visitFee: 0 },
+    { tier: "elite", studentType: "student", duration: "annual",  price: 16000, visitFee: 0 },
 
     // Elite Members (Rank S) — Non-student
-    { tier: "elite", studentType: "non-student", duration: "monthly",   price: 2500,  visitFee: 0 },
-    { tier: "elite", studentType: "non-student", duration: "quarterly", price: 6800,  visitFee: 0 },
-    { tier: "elite", studentType: "non-student", duration: "sixmonth",  price: 12500, visitFee: 0 },
-    { tier: "elite", studentType: "non-student", duration: "yearly",    price: 22000, visitFee: 0 },
+    { tier: "elite", studentType: "non-student", duration: "monthly", price: 2500,  visitFee: 0 },
+    { tier: "elite", studentType: "non-student", duration: "annual",  price: 22000, visitFee: 0 },
   ]);
 
   await Service.deleteMany({});

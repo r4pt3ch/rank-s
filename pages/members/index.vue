@@ -3,10 +3,10 @@ const { data: members, refresh } = await useFetch("/api/members");
 const { data: plans } = await useFetch("/api/membership-plans");
 
 const DURATIONS = [
+  { id: "daily",   label: "Daily" },
+  { id: "weekly",  label: "Weekly" },
   { id: "monthly", label: "Monthly" },
-  { id: "sixmonth", label: "6 months" },
-  { id: "yearly", label: "Yearly" },
-  { id: "lifetime", label: "Lifetime" },
+  { id: "annual",  label: "Annual" },
 ];
 
 const categories = computed(() => {
