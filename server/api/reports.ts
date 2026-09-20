@@ -115,68 +115,46 @@ export default defineEventHandler(async (event) => {
 
   // --- Inventory & services sales (POS products + services added during check-in) ---
   const inventoryReceipts = receipts.filter((r) => r.kind === "pos");
-  const productTotals: Record<string, { qty: number; revenue: number }> = {};
-  const salesByDay: Record<string, { revenue: number; transactions: number; itemsSold: number }> = {};
   let totalItemsSold = 0;
   let totalRevenue = 0;
 
   for (const r of inventoryReceipts) {
     totalRevenue += r.total;
-    const key = dayKey(new Date(r.createdAt));
-    if (!salesByDay[key]) salesByDay[key] = { revenue: 0, transactions: 0, itemsSold: 0 };
-    salesByDay[key].revenue += r.total;
-    salesByDay[key].transactions += 1;
-
-    for (const item of r.items || []) {
-      totalItemsSold += item.qty;
-      salesByDay[key].itemsSold += item.qty;
-      if (!productTotals[item.name]) productTotals[item.name] = { qty: 0, revenue: 0 };
-      productTotals[item.name].qty += item.qty;
-      productTotals[item.name].revenue += item.price * item.qty;
-    }
+    for (const item of r.items || []) totalItemsSold += item.qty;
   }
 
   const inventorySales = {
     totalTransactions: inventoryReceipts.length,
     totalItemsSold,
     totalRevenue,
-    byProduct: Object.entries(productTotals)
-      .map(([name, v]) => ({ name, qty: v.qty, revenue: v.revenue }))
-      .sort((a, b) => b.revenue - a.revenue),
-    byDay: Object.entries(salesByDay)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, v]) => ({ date, revenue: v.revenue, transactions: v.transactions, itemsSold: v.itemsSold })),
+    transactions: inventoryReceipts
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map((r) => ({
+        name: r.name,
+        items: r.items || [],
+        total: r.total,
+        datetime: r.createdAt,
+      })),
   };
 
   // --- Membership plan sales report ---
   const membershipReceipts = receipts.filter((r) => r.kind === "membership");
-  const planTotals: Record<string, { count: number; revenue: number }> = {};
-  const membershipByDay: Record<string, { count: number; revenue: number }> = {};
   let membershipRevenue = 0;
-
-  for (const r of membershipReceipts) {
-    membershipRevenue += r.total;
-    const key = dayKey(new Date(r.createdAt));
-    if (!membershipByDay[key]) membershipByDay[key] = { count: 0, revenue: 0 };
-    membershipByDay[key].count += 1;
-    membershipByDay[key].revenue += r.total;
-
-    for (const item of r.items || []) {
-      if (!planTotals[item.name]) planTotals[item.name] = { count: 0, revenue: 0 };
-      planTotals[item.name].count += item.qty;
-      planTotals[item.name].revenue += item.price * item.qty;
-    }
-  }
+  for (const r of membershipReceipts) membershipRevenue += r.total;
 
   const membershipSales = {
     totalSales: membershipReceipts.length,
     totalRevenue: membershipRevenue,
-    byPlan: Object.entries(planTotals)
-      .map(([name, v]) => ({ name, count: v.count, revenue: v.revenue }))
-      .sort((a, b) => b.revenue - a.revenue),
-    byDay: Object.entries(membershipByDay)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, v]) => ({ date, count: v.count, revenue: v.revenue })),
+    transactions: membershipReceipts
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map((r) => ({
+        name: r.name,
+        plan: r.items?.[0]?.name || "Membership",
+        amount: r.total,
+        datetime: r.createdAt,
+      })),
   };
 
   return {

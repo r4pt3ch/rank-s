@@ -121,11 +121,11 @@ function exportInventory() {
     ["Items sold", inv.totalItemsSold],
     ["Total revenue", inv.totalRevenue],
     [],
-    ["Date", "Transactions", "Items sold", "Revenue"],
-    ...inv.byDay.map((d) => [d.date, d.transactions, d.itemsSold, d.revenue]),
-    [],
-    ["Product / Service", "Qty", "Revenue"],
-    ...inv.byProduct.map((p) => [p.name, p.qty, p.revenue]),
+    ["Client", "Items", "Amount", "Date", "Time"],
+    ...(inv.transactions || []).map((t) => {
+      const d = new Date(t.datetime);
+      return [t.name, t.items.map((i) => `${i.name} x${i.qty}`).join("; "), t.total, d.toLocaleDateString("en-PH"), d.toLocaleTimeString("en-PH")];
+    }),
   ];
   downloadCSV(`rank-s-inventory-services-${periodSlug()}.csv`, rows);
 }
@@ -139,11 +139,11 @@ function exportMembership() {
     ["Memberships sold", m.totalSales],
     ["Total revenue", m.totalRevenue],
     [],
-    ["Date", "Count", "Revenue"],
-    ...m.byDay.map((d) => [d.date, d.count, d.revenue]),
-    [],
-    ["Plan", "Count", "Revenue"],
-    ...m.byPlan.map((p) => [p.name, p.count, p.revenue]),
+    ["Member", "Plan", "Amount", "Date", "Time"],
+    ...(m.transactions || []).map((t) => {
+      const d = new Date(t.datetime);
+      return [t.name, t.plan, t.amount, d.toLocaleDateString("en-PH"), d.toLocaleTimeString("en-PH")];
+    }),
   ];
   downloadCSV(`rank-s-membership-sales-${periodSlug()}.csv`, rows);
 }
@@ -331,25 +331,18 @@ const grandTotal = computed(() => {
         <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Items sold</div><div style="font-size: 24px; font-weight: 800;">{{ data.inventorySales.totalItemsSold }}</div></div>
         <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total revenue</div><div style="font-size: 24px; font-weight: 800;">₱{{ data.inventorySales.totalRevenue.toLocaleString() }}</div></div>
       </div>
-      <div class="rs-card" style="padding: 0; margin-bottom: 18px;">
-        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">Daily sales</div>
-        <div v-if="!data.inventorySales.byDay.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No sales in this period.</div>
-        <div v-for="d in data.inventorySales.byDay" :key="d.date" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
-          <span style="font-size: 12.5px; color: #aab0bb;">{{ d.date }}</span>
-          <span style="font-size: 12.5px;">{{ d.transactions }} txns</span>
-          <span style="font-size: 12.5px;">{{ d.itemsSold }} items</span>
-          <span style="font-size: 12.5px; color: #5bb8f5; text-align: right;">₱{{ d.revenue.toLocaleString() }}</span>
-        </div>
-      </div>
       <div class="rs-card" style="padding: 0;">
-        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
-          <span>Product / Service</span><span>Qty</span><span>Revenue</span>
+        <div style="display: grid; grid-template-columns: 1fr 2fr 80px 100px; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
+          <span>Client</span><span>Items</span><span>Amount</span><span>Date & time</span>
         </div>
-        <div v-if="!data.inventorySales.byProduct.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No sales in this period.</div>
-        <div v-for="p in data.inventorySales.byProduct" :key="p.name" style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
-          <span style="font-weight: 600; font-size: 13px;">{{ p.name }}</span>
-          <span style="font-size: 12.5px;">{{ p.qty }}</span>
-          <span style="font-size: 12.5px;">₱{{ p.revenue.toLocaleString() }}</span>
+        <div v-if="!data.inventorySales.transactions?.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No sales in this period.</div>
+        <div v-for="(t, i) in data.inventorySales.transactions" :key="i" style="display: grid; grid-template-columns: 1fr 2fr 80px 100px; gap: 8px; align-items: start; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+          <span style="font-weight: 600; font-size: 13px;">{{ t.name }}</span>
+          <div>
+            <div v-for="item in t.items" :key="item.name" style="font-size: 12px; color: #aab0bb;">{{ item.name }} × {{ item.qty }}</div>
+          </div>
+          <span style="font-size: 12.5px; color: #5bb8f5;">₱{{ t.total.toLocaleString() }}</span>
+          <span style="font-size: 11.5px; color: #7a8190;">{{ new Date(t.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</span>
         </div>
       </div>
     </template>
@@ -361,24 +354,16 @@ const grandTotal = computed(() => {
         <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Memberships sold</div><div style="font-size: 24px; font-weight: 800;">{{ data.membershipSales.totalSales }}</div></div>
         <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total revenue</div><div style="font-size: 24px; font-weight: 800;">₱{{ data.membershipSales.totalRevenue.toLocaleString() }}</div></div>
       </div>
-      <div class="rs-card" style="padding: 0; margin-bottom: 18px;">
-        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">Daily membership sales</div>
-        <div v-if="!data.membershipSales.byDay.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No membership sales in this period.</div>
-        <div v-for="d in data.membershipSales.byDay" :key="d.date" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
-          <span style="font-size: 12.5px; color: #aab0bb;">{{ d.date }}</span>
-          <span style="font-size: 12.5px;">{{ d.count }} sold</span>
-          <span style="font-size: 12.5px; color: #5bb8f5; text-align: right;">₱{{ d.revenue.toLocaleString() }}</span>
-        </div>
-      </div>
       <div class="rs-card" style="padding: 0;">
-        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
-          <span>Plan</span><span>Count</span><span>Revenue</span>
+        <div style="display: grid; grid-template-columns: 1fr 2fr 80px 100px; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
+          <span>Member</span><span>Plan</span><span>Amount</span><span>Date & time</span>
         </div>
-        <div v-if="!data.membershipSales.byPlan.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No membership sales in this period.</div>
-        <div v-for="p in data.membershipSales.byPlan" :key="p.name" style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
-          <span style="font-weight: 600; font-size: 13px;">{{ p.name }}</span>
-          <span style="font-size: 12.5px;">{{ p.count }}</span>
-          <span style="font-size: 12.5px;">₱{{ p.revenue.toLocaleString() }}</span>
+        <div v-if="!data.membershipSales.transactions?.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No membership sales in this period.</div>
+        <div v-for="(t, i) in data.membershipSales.transactions" :key="i" style="display: grid; grid-template-columns: 1fr 2fr 80px 100px; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+          <span style="font-weight: 600; font-size: 13px;">{{ t.name }}</span>
+          <span style="font-size: 12px; color: #aab0bb;">{{ t.plan }}</span>
+          <span style="font-size: 12.5px; color: #5bb8f5;">₱{{ t.amount.toLocaleString() }}</span>
+          <span style="font-size: 11.5px; color: #7a8190;">{{ new Date(t.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</span>
         </div>
       </div>
     </template>
