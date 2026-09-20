@@ -8,7 +8,15 @@ const search = ref("");
 const pinInput = ref("");
 const walkinName = ref("");
 const walkinStudentType = ref("non-student");
-const visitType = ref("daily"); // daily or weekly for member check-ins
+const visitType = ref("daily");
+const logSearch = ref("");
+
+const filteredLog = computed(() => {
+  const list = checkins.value || [];
+  if (!logSearch.value) return list;
+  const q = logSearch.value.toLowerCase();
+  return list.filter((c) => c.name.toLowerCase().includes(q));
+});
 const feedback = ref(null);
 
 // services modal state
@@ -213,9 +221,16 @@ function reopenServices(c) {
 
       <!-- Right: today's log -->
       <div class="rs-card">
-        <div style="font-weight: 700; font-size: 14px; margin-bottom: 12px;">Today's log ({{ checkins?.length || 0 }})</div>
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <div style="font-weight: 700; font-size: 14px;">Today's log</div>
+          <span style="font-size:12px; color:#5d6470;">({{ checkins?.length || 0 }} total)</span>
+          <div style="flex:1;"></div>
+          <span v-if="logSearch" style="font-size:12px; color:#5bb8f5;">{{ filteredLog.length }} result{{ filteredLog.length === 1 ? '' : 's' }}</span>
+        </div>
+        <input v-model="logSearch" class="rs-input" placeholder="Search by name..." style="margin-bottom:10px; font-size:13px;" />
         <div v-if="!checkins?.length" style="font-size: 13px; color: #5d6470; padding: 18px 0; text-align: center;">No check-ins yet.</div>
-        <div v-for="c in checkins" :key="c.id" style="display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid #1c2026;"
+        <div v-else-if="filteredLog.length === 0" style="font-size: 13px; color: #5d6470; padding: 14px 0; text-align: center;">No results for "{{ logSearch }}".</div>
+        <div v-for="c in filteredLog" :key="c.id" style="display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid #1c2026;"
           :style="{ opacity: c.voided ? 0.45 : 1 }">
           <span style="font-size:13px; font-weight:600; flex:1;">{{ c.name }}</span>
           <span v-if="c.voided" style="font-size:10px; color:#e88; border:1px solid #5a2424; border-radius:4px; padding:2px 5px;">voided</span>
