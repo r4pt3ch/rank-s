@@ -59,6 +59,7 @@ async function addServices() {
   servicesDone.value = true;
   addingServices.value = false;
   await refresh();
+  setTimeout(() => { showServices.value = false; servicesDone.value = false; }, 1000);
 }
 
 async function checkInMember(member) {
