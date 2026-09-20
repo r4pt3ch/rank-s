@@ -17,6 +17,15 @@ const CheckInSchema = new Schema(
     expiredBilling:{ type: Boolean, default: false },
     duplicateVisit:{ type: Boolean, default: false },
     visitType:     { type: String, enum: ["daily", "weekly", null], default: null },
+    // Void / modification request
+    voided:              { type: Boolean, default: false },
+    voidStatus:          { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },
+    voidReason:          { type: String, default: null },
+    voidRequestedBy:     { type: Schema.Types.ObjectId, ref: "User", default: null },
+    voidRequestedAt:     { type: Date, default: null },
+    voidReviewedBy:      { type: Schema.Types.ObjectId, ref: "User", default: null },
+    voidReviewedAt:      { type: Date, default: null },
+    voidRejectionReason: { type: String, default: null },
     services:      { type: [ServiceItemSchema], default: [] }, // services added at check-in
     servicesTotal: { type: Number, default: 0 },
     receipt:       { type: Schema.Types.ObjectId, ref: "Receipt", default: null },

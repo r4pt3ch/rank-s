@@ -27,6 +27,12 @@ export default defineEventHandler(async (event) => {
       billedAs: c.billedAs,
       expiredBilling: c.expiredBilling,
       duplicateVisit: c.duplicateVisit,
+      visitType: c.visitType,
+      voided: c.voided || false,
+      voidStatus: c.voidStatus || "none",
+      voidReason: c.voidReason || null,
+      services: c.services || [],
+      servicesTotal: c.servicesTotal || 0,
       source: c.source,
     }));
   }

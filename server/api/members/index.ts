@@ -26,11 +26,17 @@ export default defineEventHandler(async (event) => {
       points: m.points,
       joinDate: m.joinDate,
       rank: rankFromPoints(m.points, thresholds),
+      membershipTier: m.membershipTier,
       membershipCategory: m.membershipCategory,
+      membershipStudentType: m.membershipStudentType,
       membershipDuration: m.membershipDuration,
       membershipStart: m.membershipStart,
       membershipExpiry: m.membershipExpiry,
       membershipStatus: membershipStatus(m),
+      membershipPaused: m.membershipPaused || false,
+      membershipPausedAt: m.membershipPausedAt || null,
+      membershipPauseReason: m.membershipPauseReason || null,
+      membershipResumedAt: m.membershipResumedAt || null,
     }));
   }
 

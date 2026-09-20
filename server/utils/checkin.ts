@@ -42,6 +42,26 @@ export async function performCheckIn(opts: {
   }
 
   if (member) {
+    // Auto-resume paused subscription on check-in
+    if (member.membershipPaused && member.membershipPausedAt) {
+      const pausedMs = Date.now() - new Date(member.membershipPausedAt).getTime();
+      const pausedDays = Math.ceil(pausedMs / (1000 * 60 * 60 * 24));
+      if (member.membershipExpiry) {
+        const newExpiry = new Date(member.membershipExpiry);
+        newExpiry.setDate(newExpiry.getDate() + pausedDays);
+        newExpiry.setHours(23, 59, 59, 999);
+        member.membershipExpiry = newExpiry;
+      }
+      member.membershipPaused = false;
+      member.membershipResumedAt = new Date();
+      member.membershipPausedDays = (member.membershipPausedDays || 0) + pausedDays;
+      await member.save();
+      await logAudit(
+        opts.issuedBy || { name: opts.source === "kiosk" ? "Kiosk" : "system" },
+        `Auto-resumed subscription for "${member.name}" on check-in (paused ${pausedDays} day${pausedDays === 1 ? "" : "s"}, expiry extended)`
+      );
+    }
+
     const alreadyToday = await CheckIn.findOne({
       member: member._id,
       type: "member",

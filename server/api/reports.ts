@@ -49,8 +49,8 @@ export default defineEventHandler(async (event) => {
   const { start, end } = getRange(period, query.start as string | undefined, query.end as string | undefined);
 
   const [checkins, receipts] = await Promise.all([
-    CheckIn.find({ createdAt: { $gte: start, $lte: end } }).lean(),
-    Receipt.find({ createdAt: { $gte: start, $lte: end } }).lean(),
+    CheckIn.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
+    Receipt.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
   ]);
 
   // --- Gym goers report ---

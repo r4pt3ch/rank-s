@@ -7,8 +7,9 @@ if (user.value?.role === "member") {
 const { data: members } = await useFetch("/api/members");
 const { data: checkins, refresh: refreshCheckins } = await useFetch("/api/checkins", { query: { today: "1" } });
 const { data: notifications, refresh: refreshNotifications } = await useFetch("/api/notifications");
+const { data: voidRequests } = await useFetch("/api/void-requests");
 
-const reportable = computed(() => (checkins.value || []).filter((c) => !c.duplicateVisit));
+const reportable = computed(() => (checkins.value || []).filter((c) => !c.duplicateVisit && !c.voided));
 const walkins = computed(() => reportable.value.filter((c) => c.type === "walkin").length);
 const memberVisits = computed(() => reportable.value.filter((c) => c.type === "member").length);
 
@@ -32,6 +33,16 @@ async function resetDashboard() {
         <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 0;">Today's overview of who's in the gym.</p>
       </div>
       <button class="rs-btn-secondary" style="font-size: 12px; padding: 7px 13px;" @click="resetDashboard">Reset view</button>
+    </div>
+
+    <div
+      v-if="user?.role === 'superadmin' && voidRequests?.length"
+      style="background: #2a1a2a; border: 1px solid #7a2474; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; font-size: 13px; color: #e8a8e8; display: flex; align-items: flex-start; gap: 10px;"
+    >
+      <div style="flex: 1;">
+        {{ voidRequests.length }} void request{{ voidRequests.length > 1 ? "s" : "" }} pending your approval.
+        <NuxtLink to="/checkin" style="color: #e8a8e8; text-decoration: underline;">Review in Check-in →</NuxtLink>
+      </div>
     </div>
 
     <div

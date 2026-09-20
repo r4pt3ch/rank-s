@@ -98,6 +98,42 @@ async function checkInWalkIn() {
   }
 }
 
+// void request state
+const voidFor = ref(null);
+const voidReason = ref("");
+const voidError = ref("");
+const reviewFor = ref(null);
+const rejectionReason = ref("");
+const { data: voidRequests, refresh: refreshVoids } = await useFetch("/api/void-requests");
+const { user } = useAuth();
+
+async function requestVoid(c) {
+  voidFor.value = c;
+  voidReason.value = "";
+  voidError.value = "";
+}
+
+async function submitVoidRequest() {
+  voidError.value = "";
+  try {
+    await $fetch(`/api/checkins/${voidFor.value.id}/void-request`, { method: "POST", body: { reason: voidReason.value } });
+    voidFor.value = null;
+    await refresh();
+    await refreshVoids();
+  } catch (e) { voidError.value = e.data?.statusMessage || "Could not submit void request."; }
+}
+
+async function reviewVoid(action) {
+  await $fetch(`/api/checkins/${reviewFor.value.id}/void-review`, {
+    method: "POST",
+    body: { action, rejectionReason: rejectionReason.value },
+  });
+  reviewFor.value = null;
+  rejectionReason.value = "";
+  await refresh();
+  await refreshVoids();
+}
+
 function reopenServices(c) {
   openServicesModal(c.id, c.name);
 }
@@ -178,15 +214,88 @@ function reopenServices(c) {
       <div class="rs-card">
         <div style="font-weight: 700; font-size: 14px; margin-bottom: 12px;">Today's log ({{ checkins?.length || 0 }})</div>
         <div v-if="!checkins?.length" style="font-size: 13px; color: #5d6470; padding: 18px 0; text-align: center;">No check-ins yet.</div>
-        <div v-for="c in checkins" :key="c.id" style="display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid #1c2026;">
+        <div v-for="c in checkins" :key="c.id" style="display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid #1c2026;"
+          :style="{ opacity: c.voided ? 0.45 : 1 }">
           <span style="font-size:13px; font-weight:600; flex:1;">{{ c.name }}</span>
-          <span v-if="c.duplicateVisit" style="font-size:10px; color:#aab0bb; border:1px solid #2a2f38; border-radius:4px; padding:2px 5px;">repeat</span>
+          <span v-if="c.voided" style="font-size:10px; color:#e88; border:1px solid #5a2424; border-radius:4px; padding:2px 5px;">voided</span>
+          <span v-else-if="c.voidStatus==='pending'" style="font-size:10px; color:#f3c44b; border:1px solid #5a4a14; border-radius:4px; padding:2px 5px;">void pending</span>
+          <span v-else-if="c.duplicateVisit" style="font-size:10px; color:#aab0bb; border:1px solid #2a2f38; border-radius:4px; padding:2px 5px;">repeat</span>
           <span v-else-if="c.expiredBilling" style="font-size:10px; color:#e88; border:1px solid #5a2424; border-radius:4px; padding:2px 5px;">expired</span>
           <span style="font-size:11.5px; color:#5bb8f5;">₱{{ c.fee }}</span>
           <span style="font-size:11px; color:#7a8190;">{{ new Date(c.time).toLocaleTimeString() }}</span>
           <RankBadge v-if="c.rank" :rank="c.rank" size="sm" />
           <span v-else style="font-size:10px; color:#f3a8a8; border:1px solid #5a2424; border-radius:4px; padding:2px 5px;">Walk-in</span>
-          <button class="rs-btn-secondary" style="padding:3px 7px; font-size:11px;" @click="reopenServices(c)">+ Service</button>
+          <button v-if="!c.voided && c.voidStatus !== 'pending'" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px;" @click="reopenServices(c)">+ Service</button>
+          <button v-if="!c.voided && c.voidStatus !== 'pending'" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px; color:#e88;" @click="requestVoid(c)">Void</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending void requests panel - super admin only -->
+    <div v-if="user?.role === 'superadmin' && voidRequests?.length" class="rs-card" style="margin-top:18px; padding:0;">
+      <div style="padding:12px 18px; font-weight:700; font-size:13.5px; border-bottom:1px solid #1c2026; color:#f3c44b;">
+        Pending void requests ({{ voidRequests.length }})
+      </div>
+      <div v-for="r in voidRequests" :key="r.id" style="display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid #1c2026;">
+        <div style="flex:1;">
+          <div style="font-size:13px; font-weight:600;">{{ r.name }}</div>
+          <div style="font-size:11.5px; color:#aab0bb; margin-top:2px;">
+            Reason: {{ r.voidReason }} &nbsp;·&nbsp; Requested by {{ r.voidRequestedBy }} &nbsp;·&nbsp; Fee: ₱{{ r.fee }}
+            <span v-if="r.servicesTotal"> + ₱{{ r.servicesTotal }} services</span>
+          </div>
+        </div>
+        <button class="rs-btn-secondary" style="padding:5px 10px; font-size:12px; color:#8ee0ab; border-color:#245a34;" @click="reviewFor=r; rejectionReason=''">Review</button>
+      </div>
+    </div>
+
+    <!-- Void request modal -->
+    <div v-if="voidFor" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:60;">
+      <div style="width:400px;background:#13161b;border:1px solid #232730;border-radius:14px;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-weight:800;font-size:16px;">Request void</div>
+          <button @click="voidFor=null" style="background:transparent;border:none;color:#8a909b;cursor:pointer;">✕</button>
+        </div>
+        <p style="font-size:13px;color:#aab0bb;margin:0 0 6px;">
+          Void check-in for <b>{{ voidFor.name }}</b> (₱{{ voidFor.fee }}<span v-if="voidFor.servicesTotal"> + ₱{{ voidFor.servicesTotal }} services</span>).
+          This requires super admin approval before it's removed from reports.
+        </p>
+        <div style="font-size:11.5px;color:#5d6470;margin-bottom:14px;">Checked in at {{ voidFor.time ? new Date(voidFor.time).toLocaleTimeString() : "" }}</div>
+        <label style="font-size:12px;color:#9aa1ab;display:block;margin-bottom:6px;">Reason for void</label>
+        <input v-model="voidReason" class="rs-input" placeholder="e.g. Wrong member checked in, duplicate entry..." style="margin-bottom:10px;" />
+        <div v-if="voidError" style="color:#e36b6b;font-size:12.5px;margin-bottom:10px;">{{ voidError }}</div>
+        <div style="display:flex;gap:8px;">
+          <button class="rs-btn-secondary" style="flex:1;justify-content:center;" @click="voidFor=null">Cancel</button>
+          <button class="rs-btn-secondary" style="flex:1;justify-content:center;color:#e88;border-color:#5a2424;" :disabled="!voidReason" @click="submitVoidRequest">Submit request</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Void review modal (super admin) -->
+    <div v-if="reviewFor" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:60;">
+      <div style="width:420px;background:#13161b;border:1px solid #232730;border-radius:14px;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-weight:800;font-size:16px;">Review void request</div>
+          <button @click="reviewFor=null" style="background:transparent;border:none;color:#8a909b;cursor:pointer;">✕</button>
+        </div>
+        <div style="background:#1c2128;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;">
+          <div style="font-weight:600;margin-bottom:4px;">{{ reviewFor.name }}</div>
+          <div style="color:#aab0bb;font-size:12px;">
+            Fee: ₱{{ reviewFor.fee }}<span v-if="reviewFor.servicesTotal"> + ₱{{ reviewFor.servicesTotal }} services</span>
+            &nbsp;·&nbsp; Checked in {{ reviewFor.time ? new Date(reviewFor.time).toLocaleTimeString() : "" }}
+          </div>
+          <div style="color:#f3c44b;margin-top:8px;font-size:12px;">Void reason: "{{ reviewFor.voidReason }}"</div>
+          <div style="color:#7a8190;margin-top:2px;font-size:11.5px;">Requested by {{ reviewFor.voidRequestedBy }}</div>
+        </div>
+        <p style="font-size:12.5px;color:#aab0bb;margin:0 0 14px;">
+          <b>Approve</b> to permanently remove this check-in and its associated receipts from all reports.<br>
+          <b>Reject</b> to keep it in the system.
+        </p>
+        <label style="font-size:12px;color:#9aa1ab;display:block;margin-bottom:6px;">Rejection reason <span style="color:#5d6470;">(if rejecting)</span></label>
+        <input v-model="rejectionReason" class="rs-input" placeholder="Optional — e.g. Check-in was valid" style="margin-bottom:14px;" />
+        <div style="display:flex;gap:8px;">
+          <button class="rs-btn-secondary" style="flex:1;justify-content:center;" @click="reviewFor=null">Cancel</button>
+          <button class="rs-btn-secondary" style="flex:1;justify-content:center;color:#e88;border-color:#5a2424;" @click="reviewVoid('reject')">Reject</button>
+          <button class="rs-btn-primary" style="flex:1;justify-content:center;" @click="reviewVoid('approve')">Approve void</button>
         </div>
       </div>
     </div>
