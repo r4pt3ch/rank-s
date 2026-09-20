@@ -70,6 +70,16 @@ async function resumeSubscription() {
   } catch (e) { resumeError.value = e.data?.statusMessage || "Could not resume subscription."; }
 }
 
+function computedExpiry(startDate, duration) {
+  if (!startDate || !duration) return "—";
+  const d = new Date(startDate);
+  if (duration === "monthly")        d.setMonth(d.getMonth() + 1);
+  else if (duration === "quarterly") d.setMonth(d.getMonth() + 3);
+  else if (duration === "sixmonth")  d.setMonth(d.getMonth() + 6);
+  else if (duration === "annual")    d.setFullYear(d.getFullYear() + 1);
+  return d.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+}
+
 function formatDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
@@ -423,12 +433,11 @@ async function saveMembership() {
 
         <!-- Start date -->
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Subscription start date</label>
-        <input v-model="membershipForm.startDate" type="date" class="rs-input" style="margin-bottom: 10px;" />
-        <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px; cursor:pointer;">
-          <input type="checkbox" v-model="membershipForm.backdated" style="width:16px; height:16px;"
-            @change="membershipForm.backdated && (membershipForm.startDate = '')" />
-          <span style="font-size:12.5px; color:#aab0bb;">Registered before system — enter start date manually above</span>
-        </label>
+        <input v-model="membershipForm.startDate" type="date" class="rs-input" style="margin-bottom: 6px;" />
+        <div v-if="membershipForm.startDate && membershipForm.duration" style="font-size: 11.5px; color: #5bb8f5; margin-bottom: 14px;">
+          Expires: {{ computedExpiry(membershipForm.startDate, membershipForm.duration) }}
+        </div>
+        <div v-else style="margin-bottom:14px;"></div>
         <div v-if="matchedPlan" style="font-size: 13px; margin-bottom: 12px;">
           Subscription price: <b style="color: #5bb8f5;">₱{{ matchedPlan.price.toLocaleString() }}</b>
           <span v-if="matchedPlan.weeklyFee && membershipForm.tier === 'regular'" style="color:#7a8190; font-size:12px; margin-left:6px;">· Weekly pass: ₱{{ matchedPlan.weeklyFee.toLocaleString() }}</span>
