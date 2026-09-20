@@ -77,9 +77,37 @@ function formatDate(d) {
 const newMember = ref({ firstName: "", lastName: "", email: "", phone: "", address: "", dob: "" });
 const addError = ref("");
 
-const filtered = computed(() =>
-  (members.value || []).filter((m) => m.name.toLowerCase().includes(query.value.toLowerCase()))
-);
+const filterTab = ref("all"); // 'all' | 'expired' | 'expiring'
+
+const filtered = computed(() => {
+  const now = new Date();
+  const in3days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  return (members.value || []).filter((m) => {
+    const nameMatch = m.name.toLowerCase().includes(query.value.toLowerCase());
+    if (!nameMatch) return false;
+    if (filterTab.value === "expired") return m.membershipStatus === "expired";
+    if (filterTab.value === "expiring") {
+      if (m.membershipStatus !== "active" || !m.membershipExpiry) return false;
+      const expiry = new Date(m.membershipExpiry);
+      return expiry >= now && expiry <= in3days;
+    }
+    return true;
+  });
+});
+
+const filterCounts = computed(() => {
+  const now = new Date();
+  const in3days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const list = members.value || [];
+  return {
+    expired:  list.filter((m) => m.membershipStatus === "expired").length,
+    expiring: list.filter((m) => {
+      if (m.membershipStatus !== "active" || !m.membershipExpiry) return false;
+      const exp = new Date(m.membershipExpiry);
+      return exp >= now && exp <= in3days;
+    }).length,
+  };
+});
 
 function statusLabel(m) {
   if (m.membershipStatus === "paused")  return "Paused";
@@ -163,6 +191,22 @@ async function saveMembership() {
     <h1 style="font-size: 22px; font-weight: 800; margin: 0;">Gym members</h1>
     <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 12px;">Create accounts, issue QR / barcode / PIN credentials, and manage member information and membership.</p>
     <p v-if="saleConfirmation" style="font-size: 13px; color: #8ee0ab; margin: 0 0 18px;">{{ saleConfirmation }}</p>
+
+    <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+      <button class="rs-btn-secondary" style="font-size:12.5px; padding:6px 14px;"
+        :style="{ background: filterTab==='all' ? '#1c2128':'transparent', color: filterTab==='all' ? '#5bb8f5':'#aab0bb', borderColor: filterTab==='all' ? '#2f8fd6':'#2a2f38' }"
+        @click="filterTab='all'">All members</button>
+      <button class="rs-btn-secondary" style="font-size:12.5px; padding:6px 14px;"
+        :style="{ background: filterTab==='expired' ? '#2a1414':'transparent', color: filterTab==='expired' ? '#e88':'#aab0bb', borderColor: filterTab==='expired' ? '#5a2424':'#2a2f38' }"
+        @click="filterTab='expired'">
+        Expired <span v-if="filterCounts.expired" style="margin-left:4px; background:#5a2424; color:#e88; border-radius:10px; padding:1px 6px; font-size:11px;">{{ filterCounts.expired }}</span>
+      </button>
+      <button class="rs-btn-secondary" style="font-size:12.5px; padding:6px 14px;"
+        :style="{ background: filterTab==='expiring' ? '#2a1f14':'transparent', color: filterTab==='expiring' ? '#f3c44b':'#aab0bb', borderColor: filterTab==='expiring' ? '#5a4a14':'#2a2f38' }"
+        @click="filterTab='expiring'">
+        Expiring in 3 days <span v-if="filterCounts.expiring" style="margin-left:4px; background:#5a4a14; color:#f3c44b; border-radius:10px; padding:1px 6px; font-size:11px;">{{ filterCounts.expiring }}</span>
+      </button>
+    </div>
 
     <div style="display: flex; gap: 10px; margin-bottom: 18px;">
       <input v-model="query" class="rs-input" placeholder="Search members..." />
