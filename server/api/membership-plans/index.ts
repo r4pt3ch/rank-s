@@ -9,8 +9,16 @@ export default defineEventHandler(async (event) => {
 
   if (method === "GET") {
     await requireRole(event, ["superadmin", "admin", "member"]);
-    const plans = await MembershipPlan.find().sort({ tier: 1, duration: 1 }).lean();
-    return plans.map((p) => ({ id: String(p._id), tier: p.tier, studentType: p.studentType, duration: p.duration, price: p.price, visitFee: p.visitFee }));
+    const plans = await MembershipPlan.find().sort({ tier: 1, studentType: 1, duration: 1 }).lean();
+    return plans.map((p) => ({
+      id: String(p._id),
+      tier: p.tier,
+      studentType: p.studentType,
+      duration: p.duration,
+      price: p.price,
+      dailyFee: p.dailyFee,
+      weeklyFee: p.weeklyFee,
+    }));
   }
 
   if (method === "POST") {
@@ -33,7 +41,8 @@ export default defineEventHandler(async (event) => {
       studentType,
       duration: body.duration,
       price: Number(body.price) || 0,
-      visitFee: Number(body.visitFee) || 0,
+      dailyFee: Number(body.dailyFee) || 0,
+      weeklyFee: Number(body.weeklyFee) || 0,
     });
     await logAudit(user, `Added membership plan: ${body.tier} / ${studentType} / ${body.duration}`);
     return { id: String(plan._id), ...plan.toObject() };

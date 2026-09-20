@@ -25,6 +25,7 @@ export async function performCheckIn(opts: {
   pin?: string;
   walkinName?: string;
   walkinStudentType?: "student" | "non-student";
+  visitType?: "daily" | "weekly"; // for members with subscriptions
   issuedBy?: { id?: string; name: string } | null;
   source: "staff" | "kiosk";
 }) {
@@ -107,9 +108,10 @@ export async function performCheckIn(opts: {
       const tier = member.membershipTier || member.membershipCategory;
       if (tier && member.membershipDuration) {
         const plan = await getMembershipPlan(tier, member.membershipDuration, studentType);
-        fee = plan?.visitFee || 0;
+        const visitType = opts.visitType || "daily";
+        fee = visitType === "weekly" ? (plan?.weeklyFee || 0) : (plan?.dailyFee || 0);
         billedAs = "member";
-        feeLabel = `Gym visit fee (${tierLabel(tier)} / ${studentType}) - ${member.name}`;
+        feeLabel = `Gym visit fee (${tierLabel(tier)} / ${studentType} / ${visitType}) - ${member.name}`;
       }
     }
 
@@ -135,6 +137,7 @@ export async function performCheckIn(opts: {
       billedAs,
       expiredBilling,
       duplicateVisit: false,
+      visitType: opts.visitType || null,
       receipt: receiptId,
       issuedBy: opts.issuedBy?.id || null,
       source: opts.source,

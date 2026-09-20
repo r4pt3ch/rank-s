@@ -3,11 +3,12 @@ const { data: members } = await useFetch("/api/members");
 const { data: checkins, refresh } = await useFetch("/api/checkins", { query: { today: "1" } });
 const { data: allServices } = await useFetch("/api/services");
 
-const tab = ref("member"); // 'member' | 'walkin'
+const tab = ref("member");
 const search = ref("");
 const pinInput = ref("");
 const walkinName = ref("");
 const walkinStudentType = ref("non-student");
+const visitType = ref("daily"); // daily or weekly for member check-ins
 const feedback = ref(null);
 
 // services modal state
@@ -62,8 +63,8 @@ async function addServices() {
 
 async function checkInMember(member) {
   try {
-    const result = await $fetch("/api/checkins", { method: "POST", body: { memberId: member.id } });
-    feedback.value = { ok: true, text: `${result.name} checked in.${result.leveledUp ? ` Leveled up to ${result.rank}!` : ""}${feeText(result)}` };
+    const result = await $fetch("/api/checkins", { method: "POST", body: { memberId: member.id, visitType: visitType.value } });
+    feedback.value = { ok: true, text: `${result.name} checked in (${visitType.value}).${result.leveledUp ? ` Leveled up to ${result.rank}!` : ""}${feeText(result)}` };
     search.value = "";
     await refresh();
     openServicesModal(result.id, result.name);
@@ -74,8 +75,8 @@ async function checkInMember(member) {
 
 async function checkInByPin() {
   try {
-    const result = await $fetch("/api/checkins", { method: "POST", body: { pin: pinInput.value } });
-    feedback.value = { ok: true, text: `${result.name} checked in.${result.leveledUp ? ` Leveled up to ${result.rank}!` : ""}${feeText(result)}` };
+    const result = await $fetch("/api/checkins", { method: "POST", body: { pin: pinInput.value, visitType: visitType.value } });
+    feedback.value = { ok: true, text: `${result.name} checked in (${visitType.value}).${result.leveledUp ? ` Leveled up to ${result.rank}!` : ""}${feeText(result)}` };
     pinInput.value = "";
     await refresh();
     openServicesModal(result.id, result.name);
@@ -121,6 +122,17 @@ function reopenServices(c) {
 
         <!-- Member tab -->
         <template v-if="tab === 'member'">
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px; color:#9aa1ab; margin-bottom:6px;">Visit type</div>
+            <div style="display:flex; gap:8px;">
+              <button class="rs-btn-secondary" style="flex:1; justify-content:center; font-size:12.5px;"
+                :style="{ background: visitType==='daily' ? '#1c2128':'transparent', color: visitType==='daily' ? '#5bb8f5':'#aab0bb', borderColor: visitType==='daily' ? '#2f8fd6':'#2a2f38' }"
+                @click="visitType='daily'">Daily check-in</button>
+              <button class="rs-btn-secondary" style="flex:1; justify-content:center; font-size:12.5px;"
+                :style="{ background: visitType==='weekly' ? '#1c2128':'transparent', color: visitType==='weekly' ? '#5bb8f5':'#aab0bb', borderColor: visitType==='weekly' ? '#2f8fd6':'#2a2f38' }"
+                @click="visitType='weekly'">Weekly check-in</button>
+            </div>
+          </div>
           <div style="font-weight: 700; font-size: 13px; margin-bottom: 10px; color: #aab0bb;">Search by name</div>
           <input v-model="search" class="rs-input" placeholder="Search member name..." style="margin-bottom: 10px;" />
           <div v-for="m in matches" :key="m.id" class="rs-row">

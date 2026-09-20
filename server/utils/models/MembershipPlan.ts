@@ -1,12 +1,12 @@
 import mongoose, { Schema } from "mongoose";
 
 export const MEMBERSHIP_TIERS = ["walkin", "regular", "elite"] as const;
-export const DURATIONS = ["daily", "weekly", "monthly", "annual"] as const;
+export const DURATIONS = ["monthly", "annual"] as const; // subscription period
 export const STUDENT_TYPES = ["student", "non-student"] as const;
 
 export const TIER_DURATIONS: Record<string, string[]> = {
   walkin:  [],
-  regular: ["daily", "weekly", "monthly", "annual"],
+  regular: ["monthly", "annual"],
   elite:   ["monthly", "annual"],
 };
 
@@ -17,8 +17,6 @@ export const TIER_LABELS: Record<string, string> = {
 };
 
 export const DURATION_LABELS: Record<string, string> = {
-  daily:   "Daily",
-  weekly:  "Weekly",
   monthly: "Monthly",
   annual:  "Annual",
 };
@@ -28,8 +26,9 @@ const MembershipPlanSchema = new Schema(
     tier:        { type: String, enum: MEMBERSHIP_TIERS, required: true },
     studentType: { type: String, enum: STUDENT_TYPES, required: true, default: "non-student" },
     duration:    { type: String, enum: DURATIONS, required: true },
-    price:       { type: Number, required: true, default: 0 },
-    visitFee:    { type: Number, required: true, default: 0 },
+    price:       { type: Number, required: true, default: 0 }, // subscription price
+    dailyFee:    { type: Number, required: true, default: 0 }, // charged per daily check-in
+    weeklyFee:   { type: Number, required: true, default: 0 }, // charged per weekly check-in
   },
   { timestamps: true }
 );

@@ -13,7 +13,8 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event);
     const patch: Record<string, any> = {};
     if (body.price !== undefined) patch.price = Number(body.price);
-    if (body.visitFee !== undefined) patch.visitFee = Number(body.visitFee);
+    if (body.dailyFee !== undefined) patch.dailyFee = Number(body.dailyFee);
+    if (body.weeklyFee !== undefined) patch.weeklyFee = Number(body.weeklyFee);
     const plan = await MembershipPlan.findByIdAndUpdate(id, patch, { new: true });
     if (!plan) throw createError({ statusCode: 404, statusMessage: "Membership plan not found." });
     await logAudit(user, `Updated membership plan: ${plan.tier} / ${plan.duration}`);

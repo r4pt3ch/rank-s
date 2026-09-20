@@ -16,6 +16,7 @@ const CheckInSchema = new Schema(
     billedAs:      { type: String, enum: ["member", "walkin"], default: "walkin" },
     expiredBilling:{ type: Boolean, default: false },
     duplicateVisit:{ type: Boolean, default: false },
+    visitType:     { type: String, enum: ["daily", "weekly", null], default: null },
     services:      { type: [ServiceItemSchema], default: [] }, // services added at check-in
     servicesTotal: { type: Number, default: 0 },
     receipt:       { type: Schema.Types.ObjectId, ref: "Receipt", default: null },

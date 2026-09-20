@@ -28,7 +28,7 @@ const ReceiptSettingsSchema = new mongoose.Schema({
   showDateTime: Boolean, showCashier: Boolean, showItemizedList: Boolean, showFooterMessage: Boolean,
 });
 const MembershipPlanSchema = new mongoose.Schema(
-  { tier: String, duration: String, price: Number, visitFee: Number },
+  { tier: String, studentType: String, duration: String, price: Number, dailyFee: Number, weeklyFee: Number },
   { timestamps: true }
 );
 const ServiceSchema = new mongoose.Schema(
@@ -142,24 +142,20 @@ async function run() {
 
   await MembershipPlan.create([
     // Regular Members (Rank E-A) — Student
-    { tier: "regular", studentType: "student", duration: "daily",   price: 50,    visitFee: 50 },
-    { tier: "regular", studentType: "student", duration: "weekly",  price: 300,   visitFee: 40 },
-    { tier: "regular", studentType: "student", duration: "monthly", price: 900,   visitFee: 40 },
-    { tier: "regular", studentType: "student", duration: "annual",  price: 8500,  visitFee: 40 },
+    { tier: "regular", studentType: "student", duration: "monthly", price: 900,   dailyFee: 40, weeklyFee: 150 },
+    { tier: "regular", studentType: "student", duration: "annual",  price: 8500,  dailyFee: 40, weeklyFee: 150 },
 
     // Regular Members (Rank E-A) — Non-student
-    { tier: "regular", studentType: "non-student", duration: "daily",   price: 60,    visitFee: 60 },
-    { tier: "regular", studentType: "non-student", duration: "weekly",  price: 380,   visitFee: 50 },
-    { tier: "regular", studentType: "non-student", duration: "monthly", price: 1200,  visitFee: 50 },
-    { tier: "regular", studentType: "non-student", duration: "annual",  price: 11500, visitFee: 50 },
+    { tier: "regular", studentType: "non-student", duration: "monthly", price: 1200,  dailyFee: 50, weeklyFee: 200 },
+    { tier: "regular", studentType: "non-student", duration: "annual",  price: 11500, dailyFee: 50, weeklyFee: 200 },
 
     // Elite Members (Rank S) — Student
-    { tier: "elite", studentType: "student", duration: "monthly", price: 1800,  visitFee: 0 },
-    { tier: "elite", studentType: "student", duration: "annual",  price: 16000, visitFee: 0 },
+    { tier: "elite", studentType: "student", duration: "monthly", price: 1800,  dailyFee: 0, weeklyFee: 0 },
+    { tier: "elite", studentType: "student", duration: "annual",  price: 16000, dailyFee: 0, weeklyFee: 0 },
 
     // Elite Members (Rank S) — Non-student
-    { tier: "elite", studentType: "non-student", duration: "monthly", price: 2500,  visitFee: 0 },
-    { tier: "elite", studentType: "non-student", duration: "annual",  price: 22000, visitFee: 0 },
+    { tier: "elite", studentType: "non-student", duration: "monthly", price: 2500,  dailyFee: 0, weeklyFee: 0 },
+    { tier: "elite", studentType: "non-student", duration: "annual",  price: 22000, dailyFee: 0, weeklyFee: 0 },
   ]);
 
   await Service.deleteMany({});
