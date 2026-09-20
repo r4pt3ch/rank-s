@@ -1,5 +1,5 @@
 <script setup>
-const view = ref("goers"); // 'goers' | 'inventory' | 'membership'
+const view = ref("goers"); // 'goers' | 'checkin' | 'inventory' | 'membership'
 const period = ref("daily");
 const customStart = ref("");
 const customEnd = ref("");
@@ -8,16 +8,17 @@ const { data, pending, error: fetchError } = await useFetch("/api/reports", {
 });
 
 const views = [
-  { id: "goers", label: "Gym goers" },
-  { id: "inventory", label: "Inventory sales" },
+  { id: "goers",      label: "Gym goers" },
+  { id: "checkin",    label: "Check-in sales" },
+  { id: "inventory",  label: "Inventory & services" },
   { id: "membership", label: "Membership sales" },
 ];
 const periods = [
-  { id: "daily", label: "Daily" },
-  { id: "weekly", label: "Weekly" },
+  { id: "daily",   label: "Daily" },
+  { id: "weekly",  label: "Weekly" },
   { id: "monthly", label: "Monthly" },
   { id: "alltime", label: "All time" },
-  { id: "custom", label: "Custom range" },
+  { id: "custom",  label: "Custom range" },
 ];
 
 function selectPeriod(id) {
@@ -38,7 +39,6 @@ const rangeLabel = computed(() => {
   if (period.value === "daily") return start.toLocaleDateString();
   return `${start.toLocaleDateString()} – ${end.toLocaleDateString()}`;
 });
-
 
 function periodSlug() {
   if (period.value === "custom") return `${customStart.value || "start"}_to_${customEnd.value || "end"}`;
@@ -62,9 +62,8 @@ function exportGoers() {
   if (!data.value) return;
   const g = data.value.gymGoers;
   const rows = [
-    ["Rank S — gym goers report", period.value, rangeLabel.value],
+    ["Rank S — Gym Goers", period.value, rangeLabel.value],
     [],
-    ["Summary"],
     ["Total check-ins", g.totalCheckins],
     ["Member visits", g.memberVisits],
     ["Walk-ins", g.walkinVisits],
@@ -76,13 +75,30 @@ function exportGoers() {
   downloadCSV(`rank-s-gym-goers-${periodSlug()}.csv`, rows);
 }
 
+function exportCheckin() {
+  if (!data.value) return;
+  const c = data.value.checkinSales;
+  const rows = [
+    ["Rank S — Check-in Sales", period.value, rangeLabel.value],
+    [],
+    ["Transactions", c.totalTransactions],
+    ["Total revenue", c.totalRevenue],
+    [],
+    ["Date", "Transactions", "Revenue"],
+    ...c.byDay.map((d) => [d.date, d.transactions, d.revenue]),
+    [],
+    ["Type", "Count", "Revenue"],
+    ...c.byType.map((t) => [t.name, t.count, t.revenue]),
+  ];
+  downloadCSV(`rank-s-checkin-sales-${periodSlug()}.csv`, rows);
+}
+
 function exportInventory() {
   if (!data.value) return;
   const inv = data.value.inventorySales;
   const rows = [
-    ["Rank S — inventory sales report", period.value, rangeLabel.value],
+    ["Rank S — Inventory & Services", period.value, rangeLabel.value],
     [],
-    ["Summary"],
     ["Transactions", inv.totalTransactions],
     ["Items sold", inv.totalItemsSold],
     ["Total revenue", inv.totalRevenue],
@@ -90,23 +106,22 @@ function exportInventory() {
     ["Date", "Transactions", "Items sold", "Revenue"],
     ...inv.byDay.map((d) => [d.date, d.transactions, d.itemsSold, d.revenue]),
     [],
-    ["Product", "Qty sold", "Revenue"],
+    ["Product / Service", "Qty", "Revenue"],
     ...inv.byProduct.map((p) => [p.name, p.qty, p.revenue]),
   ];
-  downloadCSV(`rank-s-inventory-sales-${periodSlug()}.csv`, rows);
+  downloadCSV(`rank-s-inventory-services-${periodSlug()}.csv`, rows);
 }
 
 function exportMembership() {
   if (!data.value) return;
   const m = data.value.membershipSales;
   const rows = [
-    ["Rank S — membership plan sales report", period.value, rangeLabel.value],
+    ["Rank S — Membership Sales", period.value, rangeLabel.value],
     [],
-    ["Summary"],
     ["Memberships sold", m.totalSales],
     ["Total revenue", m.totalRevenue],
     [],
-    ["Date", "Memberships sold", "Revenue"],
+    ["Date", "Count", "Revenue"],
     ...m.byDay.map((d) => [d.date, d.count, d.revenue]),
     [],
     ["Plan", "Count", "Revenue"],
@@ -118,67 +133,65 @@ function exportMembership() {
 function exportSummary() {
   if (!data.value) return;
   const g = data.value.gymGoers;
+  const c = data.value.checkinSales;
   const inv = data.value.inventorySales;
   const mem = data.value.membershipSales;
-  const grandTotal = inv.totalRevenue + mem.totalRevenue;
+  const grandTotal = c.totalRevenue + inv.totalRevenue + mem.totalRevenue;
   const rows = [
     ["Rank S — Total Sales Summary", period.value, rangeLabel.value],
     [],
-    ["Category", "Amount"],
-    ["Inventory sales", inv.totalRevenue],
+    ["Category", "Revenue"],
+    ["Check-in fees", c.totalRevenue],
+    ["Inventory & services", inv.totalRevenue],
     ["Membership sales", mem.totalRevenue],
     ["TOTAL", grandTotal],
     [],
     ["Gym goers", g.totalCheckins],
     ["Unique members", g.uniqueMembers],
-    ["Member visits", g.memberVisits],
-    ["Walk-ins", g.walkinVisits],
-    [],
-    ["Memberships sold", mem.totalSales],
-    ["Inventory transactions", inv.totalTransactions],
-    ["Items sold", inv.totalItemsSold],
   ];
-  downloadCSV(`rank-s-total-sales-${periodSlug()}.csv`, rows);
+  downloadCSV(`rank-s-summary-${periodSlug()}.csv`, rows);
 }
 
 function exportCurrent() {
   if (view.value === "goers") exportGoers();
+  else if (view.value === "checkin") exportCheckin();
   else if (view.value === "inventory") exportInventory();
   else exportMembership();
 }
+
+const grandTotal = computed(() => {
+  if (!data.value) return 0;
+  return (data.value.checkinSales?.totalRevenue || 0) +
+         (data.value.inventorySales?.totalRevenue || 0) +
+         (data.value.membershipSales?.totalRevenue || 0);
+});
 </script>
 
 <template>
   <div>
     <h1 style="font-size: 22px; font-weight: 800; margin: 0;">Reports</h1>
-    <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 18px;">Gym attendance, inventory sales, and membership plan sales, viewed separately, broken down by day, week, month, or all time.</p>
+    <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 18px;">Gym attendance, check-in fees, inventory & services, and membership sales — with daily, weekly, monthly, or custom date ranges.</p>
 
-    <div style="display: flex; gap: 6px; margin-bottom: 14px;">
+    <!-- View tabs -->
+    <div style="display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap;">
       <button
-        v-for="v in views"
-        :key="v.id"
+        v-for="v in views" :key="v.id"
         class="rs-btn-secondary"
         :style="{ background: view === v.id ? '#1c2128' : 'transparent', color: view === v.id ? '#5bb8f5' : '#aab0bb', borderColor: view === v.id ? '#2f8fd6' : '#2a2f38' }"
-        @click="view = v.id"
-      >
-        {{ v.label }}
-      </button>
+        @click="view = v.id">{{ v.label }}</button>
     </div>
 
+    <!-- Period + export -->
     <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 14px; flex-wrap: wrap;">
       <button
-        v-for="p in periods"
-        :key="p.id"
+        v-for="p in periods" :key="p.id"
         class="rs-btn-secondary"
         style="padding: 7px 13px; font-size: 12px;"
         :style="{ background: period === p.id ? '#1c2128' : 'transparent', color: period === p.id ? '#5bb8f5' : '#aab0bb', borderColor: period === p.id ? '#2f8fd6' : '#2a2f38' }"
-        @click="selectPeriod(p.id)"
-      >
-        {{ p.label }}
-      </button>
+        @click="selectPeriod(p.id)">{{ p.label }}</button>
       <span v-if="period !== 'custom'" style="font-size: 12px; color: #7a8190; margin-left: 8px;">{{ rangeLabel }}</span>
       <div style="flex: 1;"></div>
-      <button class="rs-btn-secondary" style="font-size:12px;" @click="exportSummary">Export summary CSV</button>
+      <button class="rs-btn-secondary" style="font-size:12px;" @click="exportSummary">Export summary</button>
       <button class="rs-btn-secondary" @click="exportCurrent">Export CSV</button>
     </div>
 
@@ -187,64 +200,51 @@ function exportCurrent() {
       <input v-model="customStart" type="date" class="rs-input" style="width: 160px;" />
       <label style="font-size: 12px; color: #9aa1ab;">To</label>
       <input v-model="customEnd" type="date" class="rs-input" style="width: 160px;" />
-      <span v-if="fetchError" style="font-size: 12px; color: #e88;">{{ fetchError.data?.statusMessage || "Invalid date range." }}</span>
+      <span v-if="fetchError" style="font-size: 12px; color: #e88;">Invalid date range.</span>
     </div>
 
     <div v-if="pending" style="font-size: 13px; color: #5d6470; padding: 24px 0; text-align: center;">Loading report...</div>
 
-    <!-- Total sales summary — always visible across all views -->
+    <!-- Total sales summary bar -->
     <template v-if="data && !pending">
-      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px;">
-        <div class="rs-card" style="padding: 16px; border-color: #2f8fd6;">
-          <div style="font-size: 11.5px; color: #5bb8f5; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Total sales</div>
-          <div style="font-size: 26px; font-weight: 800; color: #5bb8f5;">
-            ₱{{ (data.inventorySales.totalRevenue + data.membershipSales.totalRevenue).toLocaleString() }}
-          </div>
-          <div style="font-size: 11px; color: #5d6470; margin-top: 6px;">All revenue combined</div>
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 22px;">
+        <div class="rs-card" style="padding: 14px; border-color: #2f8fd6;">
+          <div style="font-size: 11px; color: #5bb8f5; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Total sales</div>
+          <div style="font-size: 22px; font-weight: 800; color: #5bb8f5;">₱{{ grandTotal.toLocaleString() }}</div>
         </div>
-        <div class="rs-card" style="padding: 16px;">
-          <div style="font-size: 11.5px; color: #8a909b; margin-bottom: 8px;">Inventory sales</div>
-          <div style="font-size: 22px; font-weight: 800;">₱{{ data.inventorySales.totalRevenue.toLocaleString() }}</div>
-          <div style="font-size: 11px; color: #5d6470; margin-top: 6px;">{{ data.inventorySales.totalTransactions }} transactions</div>
+        <div class="rs-card" style="padding: 14px; cursor:pointer;" :style="{ borderColor: view==='checkin' ? '#2f8fd6' : '' }" @click="view='checkin'">
+          <div style="font-size: 11px; color: #8a909b; margin-bottom: 6px;">Check-in fees</div>
+          <div style="font-size: 20px; font-weight: 800;">₱{{ (data.checkinSales?.totalRevenue || 0).toLocaleString() }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">{{ data.checkinSales?.totalTransactions || 0 }} transactions</div>
         </div>
-        <div class="rs-card" style="padding: 16px;">
-          <div style="font-size: 11.5px; color: #8a909b; margin-bottom: 8px;">Membership sales</div>
-          <div style="font-size: 22px; font-weight: 800;">₱{{ data.membershipSales.totalRevenue.toLocaleString() }}</div>
-          <div style="font-size: 11px; color: #5d6470; margin-top: 6px;">{{ data.membershipSales.totalSales }} memberships sold</div>
+        <div class="rs-card" style="padding: 14px; cursor:pointer;" :style="{ borderColor: view==='inventory' ? '#2f8fd6' : '' }" @click="view='inventory'">
+          <div style="font-size: 11px; color: #8a909b; margin-bottom: 6px;">Inventory & services</div>
+          <div style="font-size: 20px; font-weight: 800;">₱{{ (data.inventorySales?.totalRevenue || 0).toLocaleString() }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">{{ data.inventorySales?.totalTransactions || 0 }} transactions</div>
         </div>
-        <div class="rs-card" style="padding: 16px;">
-          <div style="font-size: 11.5px; color: #8a909b; margin-bottom: 8px;">Gym goers</div>
-          <div style="font-size: 22px; font-weight: 800;">{{ data.gymGoers.totalCheckins }}</div>
-          <div style="font-size: 11px; color: #5d6470; margin-top: 6px;">{{ data.gymGoers.uniqueMembers }} unique members</div>
+        <div class="rs-card" style="padding: 14px; cursor:pointer;" :style="{ borderColor: view==='membership' ? '#2f8fd6' : '' }" @click="view='membership'">
+          <div style="font-size: 11px; color: #8a909b; margin-bottom: 6px;">Membership sales</div>
+          <div style="font-size: 20px; font-weight: 800;">₱{{ (data.membershipSales?.totalRevenue || 0).toLocaleString() }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">{{ data.membershipSales?.totalSales || 0 }} sold</div>
+        </div>
+        <div class="rs-card" style="padding: 14px; cursor:pointer;" :style="{ borderColor: view==='goers' ? '#2f8fd6' : '' }" @click="view='goers'">
+          <div style="font-size: 11px; color: #8a909b; margin-bottom: 6px;">Gym goers</div>
+          <div style="font-size: 20px; font-weight: 800;">{{ data.gymGoers?.totalCheckins || 0 }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">{{ data.gymGoers?.uniqueMembers || 0 }} unique</div>
         </div>
       </div>
     </template>
 
     <!-- Gym goers view -->
-    <template v-else-if="data && view === 'goers'">
+    <template v-if="data && !pending && view === 'goers'">
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px;">
-        <div class="rs-card" style="padding: 16px;">
-          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total check-ins</div>
-          <div style="font-size: 24px; font-weight: 800;">{{ data.gymGoers.totalCheckins }}</div>
-        </div>
-        <div class="rs-card" style="padding: 16px;">
-          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Member visits</div>
-          <div style="font-size: 24px; font-weight: 800;">{{ data.gymGoers.memberVisits }}</div>
-        </div>
-        <div class="rs-card" style="padding: 16px;">
-          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Walk-ins</div>
-          <div style="font-size: 24px; font-weight: 800;">{{ data.gymGoers.walkinVisits }}</div>
-        </div>
-        <div class="rs-card" style="padding: 16px;">
-          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Unique members</div>
-          <div style="font-size: 24px; font-weight: 800;">{{ data.gymGoers.uniqueMembers }}</div>
-        </div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total check-ins</div><div style="font-size: 24px; font-weight: 800;">{{ data.gymGoers.totalCheckins }}</div></div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Member visits</div><div style="font-size: 24px; font-weight: 800;">{{ data.gymGoers.memberVisits }}</div></div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Walk-ins</div><div style="font-size: 24px; font-weight: 800;">{{ data.gymGoers.walkinVisits }}</div></div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Unique members</div><div style="font-size: 24px; font-weight: 800;">{{ data.gymGoers.uniqueMembers }}</div></div>
       </div>
-
       <div class="rs-card" style="padding: 0;">
-        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">
-          {{ period === "daily" ? "Today's attendance" : "Daily attendance" }}
-        </div>
+        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">Daily attendance</div>
         <div v-if="!data.gymGoers.byDay.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No check-ins in this period.</div>
         <div v-for="d in data.gymGoers.byDay" :key="d.date" style="display: flex; align-items: center; gap: 14px; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
           <span style="font-size: 12.5px; min-width: 100px; color: #aab0bb;">{{ d.date }}</span>
@@ -252,33 +252,51 @@ function exportCurrent() {
             <div style="height: 100%; background: #2f8fd6;" :style="{ width: (d.total ? (d.member / d.total) * 100 : 0) + '%' }"></div>
             <div style="height: 100%; background: #5d6470;" :style="{ width: (d.total ? (d.walkin / d.total) * 100 : 0) + '%' }"></div>
           </div>
-          <span style="font-size: 12px; color: #5bb8f5; min-width: 70px; text-align: right;">{{ d.member }} members</span>
+          <span style="font-size: 12px; color: #5bb8f5; min-width: 80px; text-align: right;">{{ d.member }} members</span>
           <span style="font-size: 12px; color: #aab0bb; min-width: 60px; text-align: right;">{{ d.walkin }} walk-in</span>
         </div>
       </div>
     </template>
 
-    <!-- Inventory sales view -->
-    <template v-else-if="data && view === 'inventory'">
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px;">
-        <div class="rs-card" style="padding: 16px;">
-          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Transactions</div>
-          <div style="font-size: 24px; font-weight: 800;">{{ data.inventorySales.totalTransactions }}</div>
-        </div>
-        <div class="rs-card" style="padding: 16px;">
-          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Items sold</div>
-          <div style="font-size: 24px; font-weight: 800;">{{ data.inventorySales.totalItemsSold }}</div>
-        </div>
-        <div class="rs-card" style="padding: 16px;">
-          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total revenue</div>
-          <div style="font-size: 24px; font-weight: 800;">₱{{ data.inventorySales.totalRevenue.toLocaleString() }}</div>
+    <!-- Check-in sales view -->
+    <template v-else-if="data && !pending && view === 'checkin'">
+      <p style="font-size: 12.5px; color: #5d6470; margin: -8px 0 16px;">Visit fees collected at check-in — member per-visit fees (daily/weekly) and walk-in entrance fees.</p>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 18px;">
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Transactions</div><div style="font-size: 24px; font-weight: 800;">{{ data.checkinSales.totalTransactions }}</div></div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total revenue</div><div style="font-size: 24px; font-weight: 800;">₱{{ data.checkinSales.totalRevenue.toLocaleString() }}</div></div>
+      </div>
+      <div class="rs-card" style="padding: 0; margin-bottom: 18px;">
+        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">Daily check-in revenue</div>
+        <div v-if="!data.checkinSales.byDay.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No check-in fees in this period.</div>
+        <div v-for="d in data.checkinSales.byDay" :key="d.date" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+          <span style="font-size: 12.5px; color: #aab0bb;">{{ d.date }}</span>
+          <span style="font-size: 12.5px;">{{ d.transactions }} check-ins</span>
+          <span style="font-size: 12.5px; color: #5bb8f5; text-align: right;">₱{{ d.revenue.toLocaleString() }}</span>
         </div>
       </div>
-
-      <div class="rs-card" style="padding: 0; margin-bottom: 18px;">
-        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">
-          {{ period === "daily" ? "Today's sales" : "Daily sales" }}
+      <div class="rs-card" style="padding: 0;">
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
+          <span>Fee type</span><span>Count</span><span>Revenue</span>
         </div>
+        <div v-if="!data.checkinSales.byType.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No data.</div>
+        <div v-for="t in data.checkinSales.byType" :key="t.name" style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+          <span style="font-weight: 600; font-size: 13px;">{{ t.name }}</span>
+          <span style="font-size: 12.5px;">{{ t.count }}</span>
+          <span style="font-size: 12.5px;">₱{{ t.revenue.toLocaleString() }}</span>
+        </div>
+      </div>
+    </template>
+
+    <!-- Inventory & services view -->
+    <template v-else-if="data && !pending && view === 'inventory'">
+      <p style="font-size: 12.5px; color: #5d6470; margin: -8px 0 16px;">POS product sales and services added during or after check-in.</p>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px;">
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Transactions</div><div style="font-size: 24px; font-weight: 800;">{{ data.inventorySales.totalTransactions }}</div></div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Items sold</div><div style="font-size: 24px; font-weight: 800;">{{ data.inventorySales.totalItemsSold }}</div></div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total revenue</div><div style="font-size: 24px; font-weight: 800;">₱{{ data.inventorySales.totalRevenue.toLocaleString() }}</div></div>
+      </div>
+      <div class="rs-card" style="padding: 0; margin-bottom: 18px;">
+        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">Daily sales</div>
         <div v-if="!data.inventorySales.byDay.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No sales in this period.</div>
         <div v-for="d in data.inventorySales.byDay" :key="d.date" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
           <span style="font-size: 12.5px; color: #aab0bb;">{{ d.date }}</span>
@@ -287,10 +305,9 @@ function exportCurrent() {
           <span style="font-size: 12.5px; color: #5bb8f5; text-align: right;">₱{{ d.revenue.toLocaleString() }}</span>
         </div>
       </div>
-
       <div class="rs-card" style="padding: 0;">
         <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
-          <span>Product</span><span>Qty sold</span><span>Revenue</span>
+          <span>Product / Service</span><span>Qty</span><span>Revenue</span>
         </div>
         <div v-if="!data.inventorySales.byProduct.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No sales in this period.</div>
         <div v-for="p in data.inventorySales.byProduct" :key="p.name" style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
@@ -302,25 +319,14 @@ function exportCurrent() {
     </template>
 
     <!-- Membership sales view -->
-    <template v-else-if="data && view === 'membership'">
-      <p style="font-size: 12.5px; color: #5d6470; margin: -8px 0 16px;">
-        Revenue from membership plans sold or renewed via the "Membership" action on the Gym members page. Separate from per-visit fees, which show under Inventory sales.
-      </p>
+    <template v-else-if="data && !pending && view === 'membership'">
+      <p style="font-size: 12.5px; color: #5d6470; margin: -8px 0 16px;">Revenue from membership plans sold or renewed on the Gym Members page.</p>
       <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 18px;">
-        <div class="rs-card" style="padding: 16px;">
-          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Memberships sold</div>
-          <div style="font-size: 24px; font-weight: 800;">{{ data.membershipSales.totalSales }}</div>
-        </div>
-        <div class="rs-card" style="padding: 16px;">
-          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total revenue</div>
-          <div style="font-size: 24px; font-weight: 800;">₱{{ data.membershipSales.totalRevenue.toLocaleString() }}</div>
-        </div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Memberships sold</div><div style="font-size: 24px; font-weight: 800;">{{ data.membershipSales.totalSales }}</div></div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total revenue</div><div style="font-size: 24px; font-weight: 800;">₱{{ data.membershipSales.totalRevenue.toLocaleString() }}</div></div>
       </div>
-
       <div class="rs-card" style="padding: 0; margin-bottom: 18px;">
-        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">
-          {{ period === "daily" ? "Today's membership sales" : "Daily membership sales" }}
-        </div>
+        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">Daily membership sales</div>
         <div v-if="!data.membershipSales.byDay.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No membership sales in this period.</div>
         <div v-for="d in data.membershipSales.byDay" :key="d.date" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
           <span style="font-size: 12.5px; color: #aab0bb;">{{ d.date }}</span>
@@ -328,7 +334,6 @@ function exportCurrent() {
           <span style="font-size: 12.5px; color: #5bb8f5; text-align: right;">₱{{ d.revenue.toLocaleString() }}</span>
         </div>
       </div>
-
       <div class="rs-card" style="padding: 0;">
         <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
           <span>Plan</span><span>Count</span><span>Revenue</span>

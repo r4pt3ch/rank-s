@@ -77,8 +77,38 @@ export default defineEventHandler(async (event) => {
       .map(([date, v]) => ({ date, member: v.member, walkin: v.walkin, total: v.member + v.walkin })),
   };
 
-  // --- Inventory sales report (POS product sales + automatic visit fees; excludes membership plan sales) ---
-  const inventoryReceipts = receipts.filter((r) => r.kind !== "membership");
+  // --- Check-in sales (visit fees charged at check-in: member visit fees + walk-in fees) ---
+  const checkinReceipts = receipts.filter((r) => r.kind === "visit");
+  const checkinByDay: Record<string, { revenue: number; transactions: number }> = {};
+  const checkinByType: Record<string, { count: number; revenue: number }> = {};
+  let checkinRevenue = 0;
+
+  for (const r of checkinReceipts) {
+    checkinRevenue += r.total;
+    const key = dayKey(new Date(r.createdAt));
+    if (!checkinByDay[key]) checkinByDay[key] = { revenue: 0, transactions: 0 };
+    checkinByDay[key].revenue += r.total;
+    checkinByDay[key].transactions += 1;
+    for (const item of r.items || []) {
+      if (!checkinByType[item.name]) checkinByType[item.name] = { count: 0, revenue: 0 };
+      checkinByType[item.name].count += item.qty;
+      checkinByType[item.name].revenue += item.price * item.qty;
+    }
+  }
+
+  const checkinSales = {
+    totalTransactions: checkinReceipts.length,
+    totalRevenue: checkinRevenue,
+    byType: Object.entries(checkinByType)
+      .map(([name, v]) => ({ name, count: v.count, revenue: v.revenue }))
+      .sort((a, b) => b.revenue - a.revenue),
+    byDay: Object.entries(checkinByDay)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, v]) => ({ date, revenue: v.revenue, transactions: v.transactions })),
+  };
+
+  // --- Inventory & services sales (POS products + services added during check-in) ---
+  const inventoryReceipts = receipts.filter((r) => r.kind === "pos");
   const productTotals: Record<string, { qty: number; revenue: number }> = {};
   const salesByDay: Record<string, { revenue: number; transactions: number; itemsSold: number }> = {};
   let totalItemsSold = 0;
@@ -147,7 +177,10 @@ export default defineEventHandler(async (event) => {
     period,
     range: { start, end },
     gymGoers,
+    checkinSales,
     inventorySales,
+    membershipSales,
+  };
     membershipSales,
   };
 });
