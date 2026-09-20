@@ -366,7 +366,6 @@ async function saveMembership() {
         <button class="rs-btn-primary" style="width: 100%; justify-content: center;" @click="createMember">Create member</button>
       </div>
     </div>
-    </div>
 
     <!-- Edit member modal -->
     <div v-if="editing" style="position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 50;">
