@@ -9,7 +9,10 @@ export default defineEventHandler(async (event) => {
 
   if (method === "GET") {
     await requireRole(event, ["superadmin", "admin", "user"]);
-    const members = await Member.find().sort({ createdAt: -1 }).lean();
+    const query = getQuery(event);
+    const showArchived = query.archived === "1";
+    const members = await Member.find({ archived: showArchived ? true : { $ne: true } })
+      .sort({ createdAt: -1 }).lean();
     const thresholds = await getThresholds();
     return members.map((m) => ({
       id: String(m._id),
@@ -38,6 +41,9 @@ export default defineEventHandler(async (event) => {
       membershipPauseReason: m.membershipPauseReason || null,
       membershipResumedAt: m.membershipResumedAt || null,
       weeklyPassExpiry: m.weeklyPassExpiry || null,
+      archived: m.archived || false,
+      archivedAt: m.archivedAt || null,
+      archivedReason: m.archivedReason || null,
     }));
   }
 

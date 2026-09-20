@@ -1,6 +1,7 @@
 <script setup>
 const { user } = useAuth();
 const { data: members, refresh } = await useFetch("/api/members");
+const { data: archivedMembers, refresh: refreshArchived } = await useFetch("/api/members", { query: { archived: "1" } });
 const { data: plans } = await useFetch("/api/membership-plans");
 
 const REGULAR_DURATIONS = [
@@ -87,7 +88,29 @@ function formatDate(d) {
 const newMember = ref({ firstName: "", lastName: "", email: "", phone: "", address: "", dob: "" });
 const addError = ref("");
 
-const filterTab = ref("all"); // 'all' | 'expired' | 'expiring'
+const filterTab = ref("all"); // 'all' | 'expired' | 'expiring' | 'archived'
+
+// Archive / restore
+const archiveFor   = ref(null);
+const archiveReason = ref("");
+const archiveError  = ref("");
+const restoreFor   = ref(null);
+
+async function archiveMember() {
+  archiveError.value = "";
+  try {
+    await $fetch(`/api/members/${archiveFor.value.id}/archive`, { method: "POST", body: { reason: archiveReason.value } });
+    archiveFor.value = null;
+    archiveReason.value = "";
+    await Promise.all([refresh(), refreshArchived()]);
+  } catch (e) { archiveError.value = e.data?.statusMessage || "Could not archive member."; }
+}
+
+async function restoreMember() {
+  await $fetch(`/api/members/${restoreFor.value.id}/restore`, { method: "POST" });
+  restoreFor.value = null;
+  await Promise.all([refresh(), refreshArchived()]);
+}
 
 const filtered = computed(() => {
   const now = new Date();
@@ -232,6 +255,11 @@ async function saveMembership() {
         @click="filterTab='expiring'">
         Expiring in 3 days <span v-if="filterCounts.expiring" style="margin-left:4px; background:#5a4a14; color:#f3c44b; border-radius:10px; padding:1px 6px; font-size:11px;">{{ filterCounts.expiring }}</span>
       </button>
+      <button v-if="user?.role === 'superadmin'" class="rs-btn-secondary" style="font-size:12.5px; padding:6px 14px;"
+        :style="{ background: filterTab==='archived' ? '#1a1a2a':'transparent', color: filterTab==='archived' ? '#aab0bb':'#aab0bb', borderColor: filterTab==='archived' ? '#3a3a5a':'#2a2f38' }"
+        @click="filterTab='archived'">
+        Archived <span v-if="archivedMembers?.length" style="margin-left:4px; background:#2a2f38; color:#7a8190; border-radius:10px; padding:1px 6px; font-size:11px;">{{ archivedMembers.length }}</span>
+      </button>
     </div>
 
     <div style="display: flex; gap: 10px; margin-bottom: 18px;">
@@ -239,7 +267,28 @@ async function saveMembership() {
       <button class="rs-btn-primary" @click="showAdd = true">Create member</button>
     </div>
 
-    <div class="rs-card" style="padding: 0;">
+    <!-- Archived members list -->
+    <template v-if="filterTab === 'archived'">
+      <div class="rs-card" style="padding: 0;">
+        <div v-if="!archivedMembers?.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No archived members.</div>
+        <div v-for="m in archivedMembers" :key="m.id" style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #1c2026; opacity: 0.7;">
+          <div style="width: 38px; height: 38px; border-radius: 50%; background: #1c2128; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #7a8190;">
+            {{ m.name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() }}
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 700; font-size: 13.5px; color: #aab0bb;">{{ m.name }}</div>
+            <div style="font-size: 11.5px; color: #7a8190;">
+              PIN {{ m.pin }} · {{ m.points }} pts
+              <span v-if="m.archivedAt"> · Archived {{ formatDate(m.archivedAt) }}</span>
+              <span v-if="m.archivedReason"> · "{{ m.archivedReason }}"</span>
+            </div>
+          </div>
+          <button class="rs-btn-secondary" style="font-size:12px; color:#8ee0ab; border-color:#245a34;" @click="restoreFor=m">Restore</button>
+        </div>
+      </div>
+    </template>
+
+    <div v-if="filterTab !== 'archived'" class="rs-card" style="padding: 0;">
       <div v-if="!filtered.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No members found.</div>
       <div v-for="m in filtered" :key="m.id" style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #1c2026;">
         <div style="width: 38px; height: 38px; border-radius: 50%; background: #1c2128; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #5bb8f5;">
@@ -259,6 +308,7 @@ async function saveMembership() {
         <button class="rs-btn-secondary" @click="openMembership(m)">Membership</button>
         <button class="rs-btn-secondary" @click="idCardFor = m">ID card</button>
         <button class="rs-btn-secondary" @click="startEdit(m)">Edit</button>
+        <button v-if="user?.role === 'superadmin'" class="rs-btn-secondary" style="padding:4px 8px; font-size:11.5px; color:#7a8190;" @click="archiveFor=m; archiveReason=''; archiveError=''">Archive</button>
         <button class="rs-btn-secondary" @click="resetCredentials(m.id)">Reset</button>
       </div>
     </div>
@@ -292,6 +342,7 @@ async function saveMembership() {
         <div v-if="addError" style="color: #e36b6b; font-size: 12.5px; margin-bottom: 10px;">{{ addError }}</div>
         <button class="rs-btn-primary" style="width: 100%; justify-content: center;" @click="createMember">Create member</button>
       </div>
+    </div>
     </div>
 
     <!-- Edit member modal -->
@@ -459,6 +510,43 @@ async function saveMembership() {
           <span style="font-size: 12.5px; color: #aab0bb;">Record this as a paid sale in Reports</span>
         </label>
         <button class="rs-btn-primary" style="width: 100%; justify-content: center;" @click="saveMembership">Save membership</button>
+      </div>
+    </div>
+
+    <!-- Archive modal -->
+    <div v-if="archiveFor" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:60;">
+      <div style="width:400px;background:#13161b;border:1px solid #232730;border-radius:14px;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-weight:800;font-size:16px;">Archive member</div>
+          <button @click="archiveFor=null" style="background:transparent;border:none;color:#8a909b;cursor:pointer;">✕</button>
+        </div>
+        <p style="font-size:13px;color:#aab0bb;margin:0 0 14px;">
+          <b>{{ archiveFor.name }}</b> will be removed from the active list. Their data and history are preserved and the account can be restored at any time.
+        </p>
+        <label style="font-size:12px;color:#9aa1ab;display:block;margin-bottom:6px;">Reason (optional)</label>
+        <input v-model="archiveReason" class="rs-input" placeholder="e.g. Moved away, inactive..." style="margin-bottom:10px;" />
+        <div v-if="archiveError" style="color:#e36b6b;font-size:12.5px;margin-bottom:10px;">{{ archiveError }}</div>
+        <div style="display:flex;gap:8px;">
+          <button class="rs-btn-secondary" style="flex:1;justify-content:center;" @click="archiveFor=null">Cancel</button>
+          <button class="rs-btn-secondary" style="flex:1;justify-content:center;color:#7a8190;border-color:#3a3f48;" @click="archiveMember">Archive member</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Restore modal -->
+    <div v-if="restoreFor" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:60;">
+      <div style="width:380px;background:#13161b;border:1px solid #232730;border-radius:14px;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-weight:800;font-size:16px;">Restore member</div>
+          <button @click="restoreFor=null" style="background:transparent;border:none;color:#8a909b;cursor:pointer;">✕</button>
+        </div>
+        <p style="font-size:13px;color:#aab0bb;margin:0 0 14px;">
+          Move <b>{{ restoreFor.name }}</b> back to the active member list.
+        </p>
+        <div style="display:flex;gap:8px;">
+          <button class="rs-btn-secondary" style="flex:1;justify-content:center;" @click="restoreFor=null">Cancel</button>
+          <button class="rs-btn-primary" style="flex:1;justify-content:center;" @click="restoreMember">Restore</button>
+        </div>
       </div>
     </div>
 
