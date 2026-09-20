@@ -1,6 +1,5 @@
 import CheckIn from "../utils/models/CheckIn";
 import Receipt from "../utils/models/Receipt";
-import Member from "../utils/models/Member";
 import { connectDB } from "../utils/db";
 import { requireRole } from "../utils/auth";
 
@@ -49,10 +48,9 @@ export default defineEventHandler(async (event) => {
   const period = ["daily", "weekly", "monthly", "alltime", "custom"].includes(String(query.period)) ? String(query.period) : "daily";
   const { start, end } = getRange(period, query.start as string | undefined, query.end as string | undefined);
 
-  const [checkins, receipts, newMembers] = await Promise.all([
+  const [checkins, receipts] = await Promise.all([
     CheckIn.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
     Receipt.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
-    Member.find({ joinDate: { $gte: start, $lte: end } }).sort({ joinDate: 1 }).lean(),
   ]);
 
   // --- Gym goers report ---
@@ -175,42 +173,6 @@ export default defineEventHandler(async (event) => {
       .map(([date, v]) => ({ date, count: v.count, revenue: v.revenue })),
   };
 
-  // --- Registered members report ---
-  const regByMonth: Record<string, { count: number; members: Array<{ name: string; tier: string | null; date: string }> }> = {};
-
-  for (const m of newMembers) {
-    const d = new Date(m.joinDate);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    if (!regByMonth[key]) regByMonth[key] = { count: 0, members: [] };
-    regByMonth[key].count++;
-    regByMonth[key].members.push({
-      name: m.name,
-      tier: m.membershipTier || m.membershipCategory || null,
-      date: d.toISOString().slice(0, 10),
-    });
-  }
-
-  // Successive membership purchases: members who have a subscription
-  const membershipPurchases = receipts
-    .filter((r) => r.kind === "membership")
-    .map((r) => ({
-      name: r.name,
-      item: r.items?.[0]?.name || "Membership",
-      amount: r.total,
-      date: new Date(r.createdAt).toISOString().slice(0, 10),
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  const registeredMembers = {
-    totalNew: newMembers.length,
-    byMonth: Object.entries(regByMonth)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([month, v]) => ({ month, count: v.count, members: v.members })),
-    membershipPurchases,
-    totalMembershipPurchases: membershipPurchases.length,
-    membershipPurchaseRevenue: membershipPurchases.reduce((s, r) => s + r.amount, 0),
-  };
-
   return {
     period,
     range: { start, end },
@@ -218,6 +180,5 @@ export default defineEventHandler(async (event) => {
     checkinSales,
     inventorySales,
     membershipSales,
-    registeredMembers,
   };
 });

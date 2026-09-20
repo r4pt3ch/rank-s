@@ -1,11 +1,28 @@
 <script setup>
-const view = ref("goers"); // 'goers' | 'checkin' | 'inventory' | 'membership'
+const view = ref("goers"); // 'goers' | 'checkin' | 'inventory' | 'membership' | 'registered'
 const period = ref("daily");
 const customStart = ref("");
 const customEnd = ref("");
 const { data, pending, error: fetchError } = await useFetch("/api/reports", {
   query: { period, start: customStart, end: customEnd },
 });
+
+// Member analytics — own filter separate from the revenue period selector
+const analyticsYear  = ref(new Date().getFullYear());
+const analyticsMonth = ref("");
+const analyticsSearch = ref("");
+const expandedMember = ref(null);
+const { data: analytics, pending: analyticsPending } = await useFetch("/api/member-analytics", {
+  query: { year: analyticsYear, month: analyticsMonth },
+  watch: [analyticsYear, analyticsMonth],
+});
+const filteredAnalytics = computed(() => {
+  const q = analyticsSearch.value.toLowerCase();
+  return (analytics.value?.members || []).filter((m) => !q || m.name.toLowerCase().includes(q));
+});
+const MONTHS = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function statusColor(s) { return s === "active" ? "#8ee0ab" : s === "expired" ? "#e88" : s === "paused" ? "#f3c44b" : "#7a8190"; }
+function years() { const y = new Date().getFullYear(); return Array.from({ length: 6 }, (_, i) => y - i); }
 
 const views = [
   { id: "goers",      label: "Gym goers" },
@@ -154,27 +171,19 @@ function exportSummary() {
 }
 
 function exportRegistered() {
-  if (!data.value) return;
-  const r = data.value.registeredMembers;
+  const list = filteredAnalytics.value;
+  if (!list.length) return;
   const rows = [
-    ["Rank S — Registered Members", period.value, rangeLabel.value],
+    [`Rank S — Registered Members Analytics`, `${analyticsYear.value}${analyticsMonth.value ? `-${String(analyticsMonth.value).padStart(2,"0")}` : ""}`],
     [],
-    ["New registrations", r.totalNew],
-    ["Membership purchases", r.totalMembershipPurchases],
-    ["Membership revenue", r.membershipPurchaseRevenue],
+    ["Name", "Join Date", "Days Registered", "Total Plans Purchased", "Longest Streak", "Current Streak", "Status"],
+    ...list.map((m) => [m.name, m.joinDate, m.daysRegistered, m.totalPurchases, m.longestStreak, m.currentStreak, m.membershipStatus]),
     [],
-    ["Month", "New members"],
-    ...r.byMonth.map((b) => [b.month, b.count]),
-    [],
-    ["New members detail"],
-    ["Name", "Tier", "Date"],
-    ...r.byMonth.flatMap((b) => b.members.map((m) => [m.name, m.tier || "—", m.date])),
-    [],
-    ["Successive membership purchases"],
-    ["Name", "Plan", "Amount", "Date"],
-    ...r.membershipPurchases.map((p) => [p.name, p.item, p.amount, p.date]),
+    ["--- Purchase detail ---"],
+    ["Member", "Date", "Plan", "Amount"],
+    ...list.flatMap((m) => m.purchases.map((p) => [m.name, p.date, p.plan, p.amount])),
   ];
-  downloadCSV(`rank-s-registered-members-${periodSlug()}.csv`, rows);
+  downloadCSV(`rank-s-member-analytics-${analyticsYear.value}.csv`, rows);
 }
 
 function exportCurrent() {
@@ -372,43 +381,65 @@ const grandTotal = computed(() => {
         </div>
       </div>
     </template>
-    <!-- Registered members view -->
-    <template v-else-if="data && !pending && view === 'registered'">
-      <p style="font-size: 12.5px; color: #5d6470; margin: -8px 0 16px;">New member registrations and successive membership purchases in the selected period.</p>
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px;">
-        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">New registrations</div><div style="font-size: 24px; font-weight: 800;">{{ data.registeredMembers.totalNew }}</div></div>
-        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Membership purchases</div><div style="font-size: 24px; font-weight: 800;">{{ data.registeredMembers.totalMembershipPurchases }}</div></div>
-        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Membership revenue</div><div style="font-size: 24px; font-weight: 800;">₱{{ data.registeredMembers.membershipPurchaseRevenue.toLocaleString() }}</div></div>
+    <!-- Registered members / member analytics view -->
+    <template v-else-if="view === 'registered'">
+      <!-- Own filter bar — independent from the revenue period selector -->
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:18px; flex-wrap:wrap;">
+        <select v-model.number="analyticsYear" class="rs-input" style="width:100px;">
+          <option v-for="y in years()" :key="y" :value="y">{{ y }}</option>
+        </select>
+        <select v-model="analyticsMonth" class="rs-input" style="width:100px;">
+          <option value="">All months</option>
+          <option v-for="(m, i) in MONTHS.slice(1)" :key="i+1" :value="i+1">{{ m }}</option>
+        </select>
+        <input v-model="analyticsSearch" class="rs-input" style="width:200px;" placeholder="Search by name..." />
+        <span style="font-size:12px; color:#5d6470;">{{ filteredAnalytics.length }} member{{ filteredAnalytics.length === 1 ? '' : 's' }}</span>
       </div>
 
-      <!-- By month breakdown -->
-      <div class="rs-card" style="padding: 0; margin-bottom: 18px;">
-        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">New registrations by month</div>
-        <div v-if="!data.registeredMembers.byMonth.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No new registrations in this period.</div>
-        <div v-for="b in data.registeredMembers.byMonth" :key="b.month">
-          <div style="display: grid; grid-template-columns: 100px 60px 1fr; gap: 10px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
-            <span style="font-size: 13px; font-weight: 600; color: #5bb8f5;">{{ b.month }}</span>
-            <span style="font-size: 13px; font-weight: 700;">{{ b.count }}</span>
-            <span style="font-size: 12px; color: #7a8190;">{{ b.members.map(m => m.name).join(", ") }}</span>
+      <div v-if="analyticsPending" style="font-size:13px; color:#5d6470; padding:24px 0; text-align:center;">Loading...</div>
+      <template v-else>
+        <div class="rs-card" style="padding:0;">
+          <!-- Header -->
+          <div style="display:grid; grid-template-columns:1.5fr 90px 80px 60px 60px 60px 70px; gap:8px; padding:10px 18px; font-size:11px; color:#5d6470; border-bottom:1px solid #1c2026;">
+            <span>Member</span>
+            <span>Joined</span>
+            <span>Days reg.</span>
+            <span>Plans</span>
+            <span>Streak</span>
+            <span>Current</span>
+            <span>Status</span>
           </div>
+          <div v-if="!filteredAnalytics.length" style="padding:24px; text-align:center; color:#5d6470; font-size:13px;">No members found.</div>
+          <template v-for="m in filteredAnalytics" :key="m.id">
+            <div style="display:grid; grid-template-columns:1.5fr 90px 80px 60px 60px 60px 70px; gap:8px; align-items:center; padding:10px 18px; border-bottom:1px solid #1c2026; cursor:pointer;"
+              :style="{ background: expandedMember === m.id ? '#0d0f12' : '' }"
+              @click="expandedMember = expandedMember === m.id ? null : m.id">
+              <span style="font-size:13px; font-weight:600;">{{ m.name }}</span>
+              <span style="font-size:12px; color:#aab0bb;">{{ m.joinDate }}</span>
+              <span style="font-size:12px;">{{ m.daysRegistered }}d</span>
+              <span style="font-size:12px; text-align:center;">{{ m.totalPurchases }}</span>
+              <span style="font-size:12px; text-align:center;" :style="{ color: m.longestStreak >= 3 ? '#8ee0ab' : '' }">{{ m.longestStreak }}x</span>
+              <span style="font-size:12px; text-align:center;" :style="{ color: m.currentStreak > 0 ? '#5bb8f5' : '#5d6470' }">{{ m.currentStreak }}x</span>
+              <span style="font-size:11px; font-weight:600;" :style="{ color: statusColor(m.membershipStatus) }">{{ m.membershipStatus }}</span>
+            </div>
+            <!-- Expanded: full purchase history -->
+            <div v-if="expandedMember === m.id" style="padding:12px 18px 16px; background:#0d0f12; border-bottom:1px solid #1c2026;">
+              <div style="font-size:12px; color:#5d6470; margin-bottom:8px;">
+                Registered {{ m.daysRegistered }} days ago · {{ m.totalPurchases }} subscription purchase{{ m.totalPurchases === 1 ? '' : 's' }} · Longest streak: {{ m.longestStreak }}x · Current streak: {{ m.currentStreak }}x
+              </div>
+              <div v-if="!m.purchases.length" style="font-size:12.5px; color:#5d6470;">No subscription purchases recorded.</div>
+              <div v-else style="display:grid; grid-template-columns:90px 1fr 80px; gap:6px; font-size:11px; color:#5d6470; margin-bottom:6px;">
+                <span>Date</span><span>Plan</span><span>Amount</span>
+              </div>
+              <div v-for="(p, i) in m.purchases" :key="i" style="display:grid; grid-template-columns:90px 1fr 80px; gap:6px; padding:5px 0; border-bottom:1px solid #1a1e24;">
+                <span style="font-size:12px; color:#aab0bb;">{{ p.date }}</span>
+                <span style="font-size:12px;">{{ p.plan }}</span>
+                <span style="font-size:12px; color:#5bb8f5;">₱{{ p.amount.toLocaleString() }}</span>
+              </div>
+            </div>
+          </template>
         </div>
-      </div>
-
-      <!-- Successive membership purchases -->
-      <div class="rs-card" style="padding: 0;">
-        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">Successive membership purchases</div>
-        <div style="display: grid; grid-template-columns: 1fr 2fr 80px 100px; gap: 8px; padding: 10px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
-          <span>Member</span><span>Plan</span><span>Amount</span><span>Date</span>
-        </div>
-        <div v-if="!data.registeredMembers.membershipPurchases.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No membership purchases in this period.</div>
-        <div v-for="(p, i) in data.registeredMembers.membershipPurchases" :key="i"
-          style="display: grid; grid-template-columns: 1fr 2fr 80px 100px; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
-          <span style="font-weight: 600; font-size: 13px;">{{ p.name }}</span>
-          <span style="font-size: 12px; color: #aab0bb;">{{ p.item }}</span>
-          <span style="font-size: 12.5px; color: #5bb8f5;">₱{{ p.amount.toLocaleString() }}</span>
-          <span style="font-size: 12px; color: #7a8190;">{{ p.date }}</span>
-        </div>
-      </div>
+      </template>
     </template>
   </div>
 </template>
