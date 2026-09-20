@@ -1,6 +1,6 @@
-import CheckIn from "../../utils/models/CheckIn";
-import { connectDB } from "../../utils/db";
-import { requireRole } from "../../utils/auth";
+import CheckIn from "../utils/models/CheckIn";
+import { connectDB } from "../utils/db";
+import { requireRole } from "../utils/auth";
 
 export default defineEventHandler(async (event) => {
   await connectDB();
