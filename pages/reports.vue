@@ -115,6 +115,32 @@ function exportMembership() {
   downloadCSV(`rank-s-membership-sales-${periodSlug()}.csv`, rows);
 }
 
+function exportSummary() {
+  if (!data.value) return;
+  const g = data.value.gymGoers;
+  const inv = data.value.inventorySales;
+  const mem = data.value.membershipSales;
+  const grandTotal = inv.totalRevenue + mem.totalRevenue;
+  const rows = [
+    ["Rank S — Total Sales Summary", period.value, rangeLabel.value],
+    [],
+    ["Category", "Amount"],
+    ["Inventory sales", inv.totalRevenue],
+    ["Membership sales", mem.totalRevenue],
+    ["TOTAL", grandTotal],
+    [],
+    ["Gym goers", g.totalCheckins],
+    ["Unique members", g.uniqueMembers],
+    ["Member visits", g.memberVisits],
+    ["Walk-ins", g.walkinVisits],
+    [],
+    ["Memberships sold", mem.totalSales],
+    ["Inventory transactions", inv.totalTransactions],
+    ["Items sold", inv.totalItemsSold],
+  ];
+  downloadCSV(`rank-s-total-sales-${periodSlug()}.csv`, rows);
+}
+
 function exportCurrent() {
   if (view.value === "goers") exportGoers();
   else if (view.value === "inventory") exportInventory();
@@ -152,6 +178,7 @@ function exportCurrent() {
       </button>
       <span v-if="period !== 'custom'" style="font-size: 12px; color: #7a8190; margin-left: 8px;">{{ rangeLabel }}</span>
       <div style="flex: 1;"></div>
+      <button class="rs-btn-secondary" style="font-size:12px;" @click="exportSummary">Export summary CSV</button>
       <button class="rs-btn-secondary" @click="exportCurrent">Export CSV</button>
     </div>
 
@@ -164,6 +191,34 @@ function exportCurrent() {
     </div>
 
     <div v-if="pending" style="font-size: 13px; color: #5d6470; padding: 24px 0; text-align: center;">Loading report...</div>
+
+    <!-- Total sales summary — always visible across all views -->
+    <template v-if="data && !pending">
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px;">
+        <div class="rs-card" style="padding: 16px; border-color: #2f8fd6;">
+          <div style="font-size: 11.5px; color: #5bb8f5; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Total sales</div>
+          <div style="font-size: 26px; font-weight: 800; color: #5bb8f5;">
+            ₱{{ (data.inventorySales.totalRevenue + data.membershipSales.totalRevenue).toLocaleString() }}
+          </div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 6px;">All revenue combined</div>
+        </div>
+        <div class="rs-card" style="padding: 16px;">
+          <div style="font-size: 11.5px; color: #8a909b; margin-bottom: 8px;">Inventory sales</div>
+          <div style="font-size: 22px; font-weight: 800;">₱{{ data.inventorySales.totalRevenue.toLocaleString() }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 6px;">{{ data.inventorySales.totalTransactions }} transactions</div>
+        </div>
+        <div class="rs-card" style="padding: 16px;">
+          <div style="font-size: 11.5px; color: #8a909b; margin-bottom: 8px;">Membership sales</div>
+          <div style="font-size: 22px; font-weight: 800;">₱{{ data.membershipSales.totalRevenue.toLocaleString() }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 6px;">{{ data.membershipSales.totalSales }} memberships sold</div>
+        </div>
+        <div class="rs-card" style="padding: 16px;">
+          <div style="font-size: 11.5px; color: #8a909b; margin-bottom: 8px;">Gym goers</div>
+          <div style="font-size: 22px; font-weight: 800;">{{ data.gymGoers.totalCheckins }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 6px;">{{ data.gymGoers.uniqueMembers }} unique members</div>
+        </div>
+      </div>
+    </template>
 
     <!-- Gym goers view -->
     <template v-else-if="data && view === 'goers'">
