@@ -47,6 +47,9 @@ const groupedReceipts = computed(() => {
   }
   return groups.slice(0, 20);
 });
+
+function reprint(r) {
+  lastReceipt.value = r;
 }
 </script>
 
