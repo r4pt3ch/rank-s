@@ -102,11 +102,11 @@ function exportCheckin() {
     ["Transactions", c.totalTransactions],
     ["Total revenue", c.totalRevenue],
     [],
-    ["Date", "Transactions", "Revenue"],
-    ...c.byDay.map((d) => [d.date, d.transactions, d.revenue]),
-    [],
-    ["Type", "Count", "Revenue"],
-    ...c.byType.map((t) => [t.name, t.count, t.revenue]),
+    ["Member / Guest", "Fee Type", "Amount", "Date", "Time"],
+    ...(c.transactions || []).map((t) => {
+      const d = new Date(t.datetime);
+      return [t.name, t.feeType, t.amount, d.toLocaleDateString("en-PH"), d.toLocaleTimeString("en-PH")];
+    }),
   ];
   downloadCSV(`rank-s-checkin-sales-${periodSlug()}.csv`, rows);
 }
@@ -310,14 +310,15 @@ const grandTotal = computed(() => {
         </div>
       </div>
       <div class="rs-card" style="padding: 0;">
-        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
-          <span>Fee type</span><span>Count</span><span>Revenue</span>
+        <div style="display: grid; grid-template-columns: 1fr 1.5fr 90px 80px; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
+          <span>Member / Guest</span><span>Fee type</span><span>Amount</span><span>Date & time</span>
         </div>
-        <div v-if="!data.checkinSales.byType.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No data.</div>
-        <div v-for="t in data.checkinSales.byType" :key="t.name" style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+        <div v-if="!data.checkinSales.transactions?.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No check-in fees in this period.</div>
+        <div v-for="(t, i) in data.checkinSales.transactions" :key="i" style="display: grid; grid-template-columns: 1fr 1.5fr 90px 80px; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
           <span style="font-weight: 600; font-size: 13px;">{{ t.name }}</span>
-          <span style="font-size: 12.5px;">{{ t.count }}</span>
-          <span style="font-size: 12.5px;">₱{{ t.revenue.toLocaleString() }}</span>
+          <span style="font-size: 12px; color: #aab0bb;">{{ t.feeType }}</span>
+          <span style="font-size: 12.5px; color: #5bb8f5;">₱{{ t.amount.toLocaleString() }}</span>
+          <span style="font-size: 11.5px; color: #7a8190;">{{ new Date(t.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</span>
         </div>
       </div>
     </template>

@@ -26,8 +26,27 @@ async function issue() {
   await refresh();
 }
 
-function reprint(r) {
-  lastReceipt.value = r;
+const groupedReceipts = computed(() => {
+  const list = (receipts.value || []);
+  const groups: Array<{ name: string; items: any[]; total: number; time: any; issuedBy: string; ids: string[] }> = [];
+
+  for (const r of list) {
+    // Try to merge a "pos" receipt into the previous "visit" receipt for the same client within 30 minutes
+    const last = groups[groups.length - 1];
+    const sameClient = last && last.name === r.name;
+    const within30min = last && (new Date(last.time).getTime() - new Date(r.time).getTime()) < 30 * 60 * 1000;
+    const mergeKinds = (r.kind === "pos" || r.kind === "visit");
+
+    if (sameClient && within30min && mergeKinds) {
+      last.items = [...last.items, ...r.items];
+      last.total += r.total;
+      last.ids.push(r.id);
+    } else {
+      groups.push({ name: r.name, items: [...r.items], total: r.total, time: r.time, issuedBy: r.issuedBy, ids: [r.id] });
+    }
+  }
+  return groups.slice(0, 20);
+});
 }
 </script>
 
@@ -59,14 +78,20 @@ function reprint(r) {
       <div class="rs-card">
         <div style="font-weight: 700; font-size: 14px; margin-bottom: 12px;">Recent receipts</div>
         <div v-if="!receipts?.length" style="font-size: 13px; color: #5d6470; padding: 18px 0; text-align: center;">No receipts issued yet.</div>
-        <div v-for="r in (receipts || []).slice(0, 10)" :key="r.id" style="padding: 10px 0; border-bottom: 1px solid #1c2026;">
+        <div v-for="g in groupedReceipts" :key="g.ids[0]" style="padding: 10px 0; border-bottom: 1px solid #1c2026;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-weight: 600; font-size: 13px;">{{ r.name }}</span>
-            <span style="font-weight: 700; font-size: 13px;">₱{{ r.total.toLocaleString() }}</span>
+            <span style="font-weight: 600; font-size: 13px;">{{ g.name }}</span>
+            <span style="font-weight: 700; font-size: 13px;">₱{{ g.total.toLocaleString() }}</span>
           </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-            <span style="font-size: 11px; color: #7a8190;">{{ new Date(r.time).toLocaleString() }} · issued by {{ r.issuedBy }}</span>
-            <button class="rs-btn-secondary" style="padding: 3px 8px; font-size: 11px;" @click="reprint(r)">Print</button>
+          <div style="margin-top: 4px;">
+            <div v-for="item in g.items" :key="item.name" style="display:flex; justify-content:space-between; font-size:11.5px; color:#aab0bb; padding:1px 0;">
+              <span>{{ item.name }} × {{ item.qty }}</span>
+              <span>₱{{ (item.price * item.qty).toLocaleString() }}</span>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+            <span style="font-size: 11px; color: #7a8190;">{{ new Date(g.time).toLocaleString() }} · {{ g.issuedBy }}</span>
+            <button class="rs-btn-secondary" style="padding: 3px 8px; font-size: 11px;" @click="reprint({ id: g.ids[0], name: g.name, items: g.items, total: g.total, time: g.time, issuedBy: g.issuedBy })">Print</button>
           </div>
         </div>
       </div>

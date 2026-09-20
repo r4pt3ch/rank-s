@@ -10,12 +10,13 @@ export default defineEventHandler(async (event) => {
 
   if (method === "GET") {
     await requireRole(event, ["superadmin", "admin", "user"]);
-    const receipts = await Receipt.find().sort({ createdAt: -1 }).limit(100).populate("issuedBy", "name").lean();
+    const receipts = await Receipt.find().sort({ createdAt: -1 }).limit(200).populate("issuedBy", "name").lean();
     return receipts.map((r: any) => ({
       id: String(r._id),
       name: r.name,
       items: r.items,
       total: r.total,
+      kind: r.kind || "pos",
       time: r.createdAt,
       issuedBy: r.issuedBy?.name || "system",
     }));

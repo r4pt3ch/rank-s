@@ -99,9 +99,15 @@ export default defineEventHandler(async (event) => {
   const checkinSales = {
     totalTransactions: checkinReceipts.length,
     totalRevenue: checkinRevenue,
-    byType: Object.entries(checkinByType)
-      .map(([name, v]) => ({ name, count: v.count, revenue: v.revenue }))
-      .sort((a, b) => b.revenue - a.revenue),
+    transactions: checkinReceipts
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map((r) => ({
+        name: r.name,
+        feeType: r.items?.[0]?.name || "Visit fee",
+        amount: r.total,
+        datetime: r.createdAt,
+      })),
     byDay: Object.entries(checkinByDay)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, v]) => ({ date, revenue: v.revenue, transactions: v.transactions })),

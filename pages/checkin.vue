@@ -241,6 +241,9 @@ async function purchaseWeeklyPass() {
           <span v-else-if="c.voidStatus==='pending'" style="font-size:10px; color:#f3c44b; border:1px solid #5a4a14; border-radius:4px; padding:2px 5px;">void pending</span>
           <span v-else-if="c.duplicateVisit" style="font-size:10px; color:#aab0bb; border:1px solid #2a2f38; border-radius:4px; padding:2px 5px;">repeat</span>
           <span v-else-if="c.expiredBilling" style="font-size:10px; color:#e88; border:1px solid #5a2424; border-radius:4px; padding:2px 5px;">expired</span>
+          <!-- Tier badge -->
+          <span v-if="c.membershipTier === 'elite'" style="font-size:10px; color:#f3c44b; border:1px solid #5a4a14; border-radius:4px; padding:2px 5px;">Rank S</span>
+          <span v-else-if="c.membershipTier === 'regular'" style="font-size:10px; color:#5bb8f5; border:1px solid #1c3a5a; border-radius:4px; padding:2px 5px;">Rank E–A</span>
           <span style="font-size:11.5px; color:#5bb8f5;">₱{{ c.fee }}</span>
           <span style="font-size:11px; color:#7a8190;">{{ new Date(c.time).toLocaleTimeString() }}</span>
           <RankBadge v-if="c.rank" :rank="c.rank" size="sm" />

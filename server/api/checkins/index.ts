@@ -16,8 +16,12 @@ export default defineEventHandler(async (event) => {
       start.setHours(0, 0, 0, 0);
       filter.createdAt = { $gte: start };
     }
-    const checkins = await CheckIn.find(filter).sort({ createdAt: -1 }).limit(200).lean();
-    return checkins.map((c) => ({
+    const checkins = await CheckIn.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .populate("member", "membershipTier membershipCategory membershipDuration membershipStudentType")
+      .lean();
+    return checkins.map((c: any) => ({
       id: String(c._id),
       name: c.name,
       type: c.type,
@@ -34,6 +38,9 @@ export default defineEventHandler(async (event) => {
       services: c.services || [],
       servicesTotal: c.servicesTotal || 0,
       source: c.source,
+      membershipTier: c.member?.membershipTier || c.member?.membershipCategory || null,
+      membershipDuration: c.member?.membershipDuration || null,
+      membershipStudentType: c.member?.membershipStudentType || null,
     }));
   }
 
