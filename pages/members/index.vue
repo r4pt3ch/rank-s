@@ -290,26 +290,49 @@ async function saveMembership() {
 
     <div v-if="filterTab !== 'archived'" class="rs-card" style="padding: 0;">
       <div v-if="!filtered.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No members found.</div>
-      <div v-for="m in filtered" :key="m.id" style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #1c2026;">
-        <div style="width: 38px; height: 38px; border-radius: 50%; background: #1c2128; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #5bb8f5;">
+      <div v-for="m in filtered" :key="m.id" style="display: grid; grid-template-columns: 40px 1fr auto auto auto; gap: 14px; align-items: center; padding: 12px 18px; border-bottom: 1px solid #1c2026;">
+
+        <!-- Avatar -->
+        <div style="width:38px; height:38px; border-radius:50%; background:#1c2128; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; color:#5bb8f5; flex-shrink:0;">
           {{ m.name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() }}
         </div>
-        <div style="flex: 1;">
-          <div style="font-weight: 700; font-size: 13.5px;">{{ m.name }}</div>
-          <div style="font-size: 11.5px; color: #7a8190;">
-            {{ m.email }} · PIN {{ m.pin }} · {{ m.points }} pts ·
+
+        <!-- Info -->
+        <div style="min-width:0;">
+          <div style="font-weight:700; font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ m.name }}</div>
+          <div style="font-size:11.5px; color:#7a8190; margin-top:2px;">
+            PIN {{ m.pin }} · {{ m.points }} pts ·
             <span :style="{ color: statusColor(m) }">{{ statusLabel(m) }}</span>
-            <span v-if="m.weeklyPassExpiry && new Date(m.weeklyPassExpiry) > new Date()" style="color:#8ee0ab; margin-left:4px;">· Weekly pass (until {{ formatDate(m.weeklyPassExpiry) }})</span>
             · Joined {{ formatDate(m.joinDate || m.createdAt) }}
           </div>
         </div>
-        <RankBadge :rank="m.rank" />
-        <button v-if="m.membershipTier === 'regular' || m.membershipCategory === 'regular'" class="rs-btn-secondary" style="font-size:11.5px; padding:4px 8px;" @click="weeklyPassFor=m">Pass</button>
-        <button class="rs-btn-secondary" @click="openMembership(m)">Membership</button>
-        <button class="rs-btn-secondary" @click="idCardFor = m">ID card</button>
-        <button class="rs-btn-secondary" @click="startEdit(m)">Edit</button>
-        <button v-if="user?.role === 'superadmin'" class="rs-btn-secondary" style="padding:4px 8px; font-size:11.5px; color:#7a8190;" @click="archiveFor=m; archiveReason=''; archiveError=''">Archive</button>
-        <button class="rs-btn-secondary" @click="resetCredentials(m.id)">Reset</button>
+
+        <!-- Rank + Pass badges -->
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
+          <RankBadge :rank="m.rank" />
+          <span v-if="m.weeklyPassExpiry && new Date(m.weeklyPassExpiry) > new Date()"
+            style="font-size:10px; color:#8ee0ab; border:1px solid #245a34; border-radius:4px; padding:2px 6px; white-space:nowrap;">
+            Pass · until {{ formatDate(m.weeklyPassExpiry) }}
+          </span>
+        </div>
+
+        <!-- Primary actions -->
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          <button v-if="m.membershipTier === 'regular' || m.membershipCategory === 'regular'"
+            class="rs-btn-secondary" style="font-size:11.5px; padding:5px 10px;"
+            @click="weeklyPassFor=m">Pass</button>
+          <button class="rs-btn-secondary" style="font-size:12px; padding:5px 12px;" @click="openMembership(m)">Membership</button>
+          <button class="rs-btn-secondary" style="font-size:12px; padding:5px 12px;" @click="startEdit(m)">Edit</button>
+        </div>
+
+        <!-- Secondary actions -->
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          <button class="rs-btn-secondary" style="font-size:11.5px; padding:5px 10px;" @click="idCardFor=m">ID card</button>
+          <button class="rs-btn-secondary" style="font-size:11.5px; padding:5px 10px;" @click="resetCredentials(m.id)">Reset</button>
+          <button v-if="user?.role === 'superadmin'"
+            class="rs-btn-secondary" style="font-size:11.5px; padding:5px 10px; color:#7a8190;"
+            @click="archiveFor=m; archiveReason=''; archiveError=''">Archive</button>
+        </div>
       </div>
     </div>
 
