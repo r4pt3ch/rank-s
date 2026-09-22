@@ -13,6 +13,7 @@ export default defineEventHandler(async (event) => {
   const members = await Member.find({
     membershipDuration: { $ne: "lifetime" },
     membershipExpiry: { $ne: null },
+    archived: { $ne: true },
   })
     .select("name membershipExpiry membershipCategory membershipDuration")
     .lean();

@@ -303,7 +303,8 @@ async function saveMembership() {
           <div style="font-size:11.5px; color:#7a8190; margin-top:2px;">
             PIN {{ m.pin }} · {{ m.points }} pts ·
             <span :style="{ color: statusColor(m) }">{{ statusLabel(m) }}</span>
-            · Joined {{ formatDate(m.joinDate || m.createdAt) }}
+            · Created {{ formatDate(m.joinDate || m.createdAt) }}
+            <template v-if="m.membershipStart"> · Sub: {{ formatDate(m.membershipStart) }} → <span :style="{ color: m.membershipStatus === 'expired' ? '#e88' : '#8ee0ab' }">{{ m.membershipExpiry ? formatDate(m.membershipExpiry) : '—' }}</span></template>
           </div>
         </div>
 

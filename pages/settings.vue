@@ -1,4 +1,5 @@
 <script setup>
+const { user } = useAuth();
 const { data, refresh } = await useFetch("/api/settings");
 const { data: receiptData } = await useFetch("/api/receipt-settings");
 
@@ -154,24 +155,26 @@ const receiptToggles = [
       </div>
     </div>
 
-    <!-- Section: Danger zone -->
-    <div style="font-size: 11px; font-weight: 700; color: #5d6470; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;">Danger zone</div>
-    <div class="rs-card" style="max-width: 500px; border-color: #5a2424;">
-      <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #e88;">Clear report data</div>
-      <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 16px;">Permanently deletes all check-in records and receipts. Cannot be undone. Member accounts, plans, and settings are not affected.</p>
-      <div v-if="reportsCleared" style="font-size:13px; color:#8ee0ab; margin-bottom:12px;">All report data has been cleared.</div>
-      <template v-if="!confirmClearReports">
-        <button class="rs-btn-secondary" style="width:100%; justify-content:center; color:#e88; border-color:#5a2424;" @click="confirmClearReports=true">Clear all report data</button>
-      </template>
-      <template v-else>
-        <div style="font-size:13px; color:#e88; font-weight:600; margin-bottom:12px;">Are you sure? This will permanently delete all check-ins and receipts.</div>
-        <div style="display:flex; gap:8px;">
-          <button class="rs-btn-secondary" style="flex:1; justify-content:center;" @click="confirmClearReports=false">Cancel</button>
-          <button class="rs-btn-secondary" style="flex:1; justify-content:center; color:#e88; border-color:#5a2424;" :disabled="clearingReports" @click="clearReportsData">
-            {{ clearingReports ? "Clearing..." : "Yes, delete everything" }}
-          </button>
-        </div>
-      </template>
-    </div>
+    <!-- Section: Danger zone (super admin only) -->
+    <template v-if="user?.role === 'superadmin'">
+      <div style="font-size: 11px; font-weight: 700; color: #5d6470; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;">Danger zone</div>
+      <div class="rs-card" style="max-width: 500px; border-color: #5a2424;">
+        <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #e88;">Clear report data</div>
+        <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 16px;">Permanently deletes all check-in records and receipts. Cannot be undone. Member accounts, plans, and settings are not affected.</p>
+        <div v-if="reportsCleared" style="font-size:13px; color:#8ee0ab; margin-bottom:12px;">All report data has been cleared.</div>
+        <template v-if="!confirmClearReports">
+          <button class="rs-btn-secondary" style="width:100%; justify-content:center; color:#e88; border-color:#5a2424;" @click="confirmClearReports=true">Clear all report data</button>
+        </template>
+        <template v-else>
+          <div style="font-size:13px; color:#e88; font-weight:600; margin-bottom:12px;">Are you sure? This will permanently delete all check-ins and receipts.</div>
+          <div style="display:flex; gap:8px;">
+            <button class="rs-btn-secondary" style="flex:1; justify-content:center;" @click="confirmClearReports=false">Cancel</button>
+            <button class="rs-btn-secondary" style="flex:1; justify-content:center; color:#e88; border-color:#5a2424;" :disabled="clearingReports" @click="clearReportsData">
+              {{ clearingReports ? "Clearing..." : "Yes, delete everything" }}
+            </button>
+          </div>
+        </template>
+      </div>
+    </template>
   </div>
 </template>
