@@ -249,7 +249,10 @@ async function purchaseWeeklyPass() {
           <!-- Tier badge -->
           <span v-if="c.membershipTier === 'elite'" style="font-size:10px; color:#f3c44b; border:1px solid #5a4a14; border-radius:4px; padding:2px 5px;">Rank S</span>
           <span v-else-if="c.membershipTier === 'regular'" style="font-size:10px; color:#5bb8f5; border:1px solid #1c3a5a; border-radius:4px; padding:2px 5px;">Rank E–A</span>
-          <span style="font-size:11.5px; color:#5bb8f5;">₱{{ c.fee }}</span>
+          <span style="font-size:11.5px; color:#5bb8f5;">
+            ₱{{ (c.fee + (c.servicesTotal || 0)).toLocaleString() }}
+            <span v-if="c.servicesTotal" style="font-size:10px; color:#7a8190;"> (₱{{ c.fee }} + ₱{{ c.servicesTotal }})</span>
+          </span>
           <span style="font-size:11px; color:#7a8190;">{{ new Date(c.time).toLocaleTimeString() }}</span>
           <RankBadge v-if="c.rank" :rank="c.rank" size="sm" />
           <span v-else style="font-size:10px; color:#f3a8a8; border:1px solid #5a2424; border-radius:4px; padding:2px 5px;">Walk-in</span>
