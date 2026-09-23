@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
 
   checkin.services.push(...items.map((s: any) => ({ name: s.name, price: Number(s.price) })));
   checkin.servicesTotal = (checkin.servicesTotal || 0) + total;
-  await checkin.save();
+  if (!checkin.serviceReceipts) checkin.serviceReceipts = [];
 
   // Log a receipt for the services
   const receipt = await Receipt.create({
@@ -30,6 +30,9 @@ export default defineEventHandler(async (event) => {
     issuedBy: user.id,
     kind: "pos",
   });
+
+  checkin.serviceReceipts.push(receipt._id);
+  await checkin.save();
 
   await logAudit(user, `Added services to check-in for "${checkin.name}" — ₱${total}`);
   return { id: String(checkin._id), services: checkin.services, servicesTotal: checkin.servicesTotal, receiptId: String(receipt._id) };

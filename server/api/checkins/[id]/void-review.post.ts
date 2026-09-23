@@ -28,19 +28,26 @@ export default defineEventHandler(async (event) => {
     if (checkin.receipt) {
       await Receipt.findByIdAndUpdate(checkin.receipt, { $set: { voided: true } });
     }
-    // Void all service receipts for this client within 30 minutes of the check-in
-    const windowEnd = new Date(checkin.createdAt);
-    windowEnd.setMinutes(windowEnd.getMinutes() + 30);
-    const serviceVoidResult = await Receipt.updateMany(
-      {
-        name: checkin.name,
-        kind: "pos",
-        voided: { $ne: true },
-        createdAt: { $gte: checkin.createdAt, $lte: windowEnd },
-      },
-      { $set: { voided: true } }
-    );
-    await logAudit(user, `Approved void for check-in "${checkin.name}" — visit fee and ${serviceVoidResult.modifiedCount} service receipt(s) removed from reports`);
+    // Void service receipts — by stored IDs (accurate) or window fallback for older records
+    let serviceVoidCount = 0;
+    const storedReceipts = (checkin as any).serviceReceipts;
+    if (storedReceipts && storedReceipts.length > 0) {
+      const res = await Receipt.updateMany(
+        { _id: { $in: storedReceipts }, voided: { $ne: true } },
+        { $set: { voided: true } }
+      );
+      serviceVoidCount = res.modifiedCount;
+    } else {
+      // Fallback for older check-ins before serviceReceipts field was added
+      const windowEnd = new Date(checkin.createdAt);
+      windowEnd.setMinutes(windowEnd.getMinutes() + 30);
+      const res = await Receipt.updateMany(
+        { name: checkin.name, kind: "pos", voided: { $ne: true }, createdAt: { $gte: checkin.createdAt, $lte: windowEnd } },
+        { $set: { voided: true } }
+      );
+      serviceVoidCount = res.modifiedCount;
+    }
+    await logAudit(user, `Approved void for check-in "${checkin.name}" — visit fee and ${serviceVoidCount} service receipt(s) voided`);
   } else {
     checkin.voidStatus = "rejected";
     checkin.voidRejectionReason = body.rejectionReason?.trim() || null;

@@ -17,6 +17,7 @@ const CheckInSchema = new Schema(
     expiredBilling:{ type: Boolean, default: false },
     duplicateVisit:{ type: Boolean, default: false },
     visitType:     { type: String, enum: ["daily", "weekly", "monthly", null], default: null },
+    serviceReceipts: [{ type: Schema.Types.ObjectId, ref: "Receipt", default: [] }],
     // Void / modification request
     voided:              { type: Boolean, default: false },
     voidStatus:          { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },
