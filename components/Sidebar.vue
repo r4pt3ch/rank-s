@@ -3,15 +3,26 @@ const { user, logout } = useAuth();
 const route = useRoute();
 
 // Sub-settings pages — shown under Settings as child links
-const settingsChildren = [
-  { to: "/membership-plans", label: "Membership plans" },
-  { to: "/services",         label: "Services" },
-  { to: "/inventory",        label: "Inventory settings" },
-  { to: "/thresholds",       label: "Rank thresholds" },
-];
-const settingsChildPaths = settingsChildren.map((c) => c.to);
+const settingsChildren = computed(() => {
+  const base = [
+    { to: "/membership-plans",  label: "Membership plans" },
+    { to: "/services",          label: "Services" },
+    { to: "/inventory",         label: "Inventory settings" },
+    { to: "/thresholds",        label: "Rank thresholds" },
+    { to: "/settings",          label: "Gym settings" },
+    { to: "/receipt-settings",  label: "Receipt settings" },
+  ];
+  if (user.value?.role === "superadmin") {
+    base.push({ to: "/clear-data", label: "Clear report data" });
+  }
+  return base;
+});
+
+const settingsChildPaths = computed(() =>
+  settingsChildren.value.map((c) => c.to)
+);
 const settingsOpen = computed(() =>
-  route.path === "/settings" || settingsChildPaths.includes(route.path)
+  settingsChildPaths.value.includes(route.path)
 );
 
 const navByRole = {
@@ -23,7 +34,7 @@ const navByRole = {
     { to: "/pos",      label: "POS / inventory" },
     { to: "/reports",  label: "Reports" },
     { to: "/monitor",  label: "Lobby monitor" },
-    { to: "/settings", label: "Settings", children: settingsChildren },
+    { to: "/membership-plans", label: "Settings", hasChildren: true },
     { to: "/users",    label: "User accounts" },
     { to: "/audit",    label: "Audit trail" },
     { to: "/loginlogs",label: "Login logs" },
@@ -37,7 +48,7 @@ const navByRole = {
     { to: "/pos",      label: "POS / inventory" },
     { to: "/reports",  label: "Reports" },
     { to: "/monitor",  label: "Lobby monitor" },
-    { to: "/settings", label: "Settings", children: settingsChildren },
+    { to: "/membership-plans", label: "Settings", hasChildren: true },
     { to: "/account",  label: "My account" },
   ],
   user: [
@@ -70,11 +81,11 @@ const roleLabel = computed(() => ({ superadmin: "Super admin", admin: "Regular a
     <div style="flex: 1;">
       <template v-for="n in nav" :key="n.to">
         <!-- Nav item with children (Settings) -->
-        <template v-if="n.children">
+        <template v-if="n.hasChildren">
           <NuxtLink
             :to="n.to"
             style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 2px; border-radius: 8px; text-decoration: none; font-size: 13.5px;"
-            :style="{ background: route.path === n.to ? '#1c2128' : settingsOpen ? '#161b22' : 'transparent', color: settingsOpen ? '#5bb8f5' : '#aab0bb', fontWeight: settingsOpen ? 600 : 500 }"
+            :style="{ background: settingsOpen ? '#161b22' : 'transparent', color: settingsOpen ? '#5bb8f5' : '#aab0bb', fontWeight: settingsOpen ? 600 : 500 }"
           >
             {{ n.label }}
             <span style="margin-left: auto; font-size: 10px; color: #5d6470;">{{ settingsOpen ? '▾' : '▸' }}</span>
@@ -82,12 +93,13 @@ const roleLabel = computed(() => ({ superadmin: "Super admin", admin: "Regular a
           <!-- Sub-items shown when settings is open -->
           <div v-if="settingsOpen" style="margin-bottom: 4px;">
             <NuxtLink
-              v-for="c in n.children" :key="c.to"
+              v-for="c in settingsChildren" :key="c.to"
               :to="c.to"
               style="display: flex; align-items: center; padding: 8px 12px 8px 28px; margin-bottom: 2px; border-radius: 8px; text-decoration: none; font-size: 12.5px;"
-              :style="{ background: route.path === c.to ? '#1c2128' : 'transparent', color: route.path === c.to ? '#5bb8f5' : '#7a8190', fontWeight: route.path === c.to ? 600 : 400 }"
+              :style="{ background: route.path === c.to ? '#1c2128' : 'transparent', color: route.path === c.to ? '#5bb8f5' : route.path.includes('clear') && c.to === '/clear-data' ? '#e88' : '#7a8190', fontWeight: route.path === c.to ? 600 : 400 }"
             >
-              {{ c.label }}
+              <span v-if="c.to === '/clear-data'" style="color:#e88;">{{ c.label }}</span>
+              <span v-else>{{ c.label }}</span>
             </NuxtLink>
           </div>
         </template>
