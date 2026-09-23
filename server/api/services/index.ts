@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const method = event.method;
 
   if (method === "GET") {
-    await requireRole(event, ["superadmin", "admin"]);
+    await requireRole(event, ["superadmin", "admin", "user"]);
     const services = await Service.find().sort({ category: 1, name: 1 }).lean();
     return services.map((s) => ({ id: String(s._id), name: s.name, price: s.price, category: s.category, active: s.active }));
   }

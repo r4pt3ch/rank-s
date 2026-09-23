@@ -30,9 +30,13 @@ const servicesDone = ref(false);
 
 const activeServices = computed(() => (allServices.value || []).filter((s) => s.active));
 
-const matches = computed(() =>
-  search.value ? (members.value || []).filter((m) => m.name.toLowerCase().includes(search.value.toLowerCase())) : []
-);
+const matches = computed(() => {
+  if (!search.value) return [];
+  const q = search.value.toLowerCase();
+  return (members.value || []).filter((m) =>
+    m.name.toLowerCase().includes(q) || m.pin?.includes(q)
+  );
+});
 
 function feeText(result) {
   if (result.duplicateVisit) return " Already checked in today — no additional charge.";
@@ -180,6 +184,7 @@ async function purchaseWeeklyPass() {
         <template v-if="tab === 'member'">
           <div style="font-weight: 700; font-size: 13px; margin-bottom: 10px; color: #aab0bb;">Search by name</div>
           <input v-model="search" class="rs-input" placeholder="Search member name..." style="margin-bottom: 10px;" />
+          <div v-if="search && !matches.length" style="font-size:12.5px; color:#5d6470; padding:8px 0;">No members found for "{{ search }}".</div>
           <div v-for="m in matches" :key="m.id" class="rs-row">
             <div style="flex:1;">
               <span style="font-size: 13.5px; font-weight: 600;">{{ m.name }}</span>
