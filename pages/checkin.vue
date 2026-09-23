@@ -177,7 +177,7 @@ async function purchaseWeeklyPass() {
     <h1 style="font-size: 22px; font-weight: 800; margin: 0;">Check-in</h1>
     <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 18px;">Log members and walk-ins entering the gym. After check-in, add any services they want to purchase.</p>
 
-    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px;">
+    <div class="rs-mobile-stack" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px;">
       <!-- Left: check-in forms -->
       <div class="rs-card">
         <div style="display: flex; gap: 8px; margin-bottom: 18px;">

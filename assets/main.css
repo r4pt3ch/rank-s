@@ -81,3 +81,35 @@ html, body, #__nuxt {
 .rs-pos-tile:active:not(:disabled) {
   transform: scale(0.97);
 }
+
+html, body { overflow-x: hidden; }
+* { box-sizing: border-box; }
+
+/* ─── Mobile responsive utilities ─── */
+@media (max-width: 768px) {
+  /* Stack side-by-side grids vertically */
+  .rs-mobile-stack { display: flex !important; flex-direction: column !important; }
+
+  /* Member row: collapse to 2 columns on mobile */
+  .rs-member-row {
+    grid-template-columns: 40px 1fr !important;
+    row-gap: 10px;
+  }
+  .rs-member-row .rs-member-badges { grid-column: 2; }
+  .rs-member-row .rs-member-actions-primary,
+  .rs-member-row .rs-member-actions-secondary {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Scrollable tables on mobile */
+  .rs-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Tighter card padding on mobile */
+  .rs-card { padding: 14px !important; }
+
+  /* Full-width buttons on mobile */
+  .rs-btn-primary, .rs-btn-secondary { font-size: 12px !important; }
+}

@@ -63,7 +63,7 @@ async function checkout() {
     <h1 style="font-size: 22px; font-weight: 800; margin: 0;">Point-of-Sale</h1>
     <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 24px;">Tap a product to add it to the cart. Sales deduct from inventory automatically.</p>
 
-    <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px;">
+    <div class="rs-mobile-stack" style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px;">
       <div class="rs-card">
         <div style="font-weight: 700; font-size: 14px; margin-bottom: 14px;">Products</div>
 

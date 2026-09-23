@@ -242,7 +242,7 @@ const grandTotal = computed(() => {
 
     <!-- Total sales summary bar -->
     <template v-if="data && !pending">
-      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 22px;">
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 22px; --rs-cols: 5;">
         <div class="rs-card" style="padding: 14px; border-color: #2f8fd6;">
           <div style="font-size: 11px; color: #5bb8f5; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Total sales</div>
           <div style="font-size: 22px; font-weight: 800; color: #5bb8f5;">₱{{ grandTotal.toLocaleString() }}</div>
@@ -272,7 +272,7 @@ const grandTotal = computed(() => {
 
     <!-- Gym goers view -->
     <template v-if="data && !pending && view === 'goers'">
-      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px;">
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 18px;">
         <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total check-ins</div><div style="font-size: 24px; font-weight: 800;">{{ data.gymGoers.totalCheckins }}</div></div>
         <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Member visits</div><div style="font-size: 24px; font-weight: 800;">{{ data.gymGoers.memberVisits }}</div></div>
         <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Walk-ins</div><div style="font-size: 24px; font-weight: 800;">{{ data.gymGoers.walkinVisits }}</div></div>
@@ -385,6 +385,8 @@ const grandTotal = computed(() => {
       <div v-if="analyticsPending" style="font-size:13px; color:#5d6470; padding:24px 0; text-align:center;">Loading...</div>
       <template v-else>
         <div class="rs-card" style="padding:0;">
+        <div class="rs-analytics-table">
+        <div style="min-width:600px;">
           <!-- Header -->
           <div style="display:grid; grid-template-columns:1.5fr 90px 80px 60px 60px 60px 70px; gap:8px; padding:10px 18px; font-size:11px; color:#5d6470; border-bottom:1px solid #1c2026;">
             <span>Member</span>
@@ -425,7 +427,23 @@ const grandTotal = computed(() => {
             </div>
           </template>
         </div>
+        </div><!-- end min-width -->
+        </div><!-- end rs-analytics-table -->
       </template>
     </template>
   </div>
 </template>
+
+<style scoped>
+@media (max-width: 768px) {
+  /* Summary bar: 2 cols on mobile */
+  [style*="--rs-cols: 5"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  /* Period buttons wrap */
+  .rs-period-bar { flex-wrap: wrap; }
+  /* Member analytics table scroll */
+  .rs-analytics-table { overflow-x: auto; }
+  .rs-analytics-table > div { min-width: 600px; }
+}
+</style>

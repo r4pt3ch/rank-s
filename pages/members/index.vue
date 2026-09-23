@@ -300,7 +300,7 @@ async function saveMembership() {
 
     <div v-if="filterTab !== 'archived'" class="rs-card" style="padding: 0;">
       <div v-if="!filtered.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No members found.</div>
-      <div v-for="m in pagedMembers" :key="m.id" style="display: grid; grid-template-columns: 40px 1fr auto auto auto; gap: 14px; align-items: center; padding: 12px 18px; border-bottom: 1px solid #1c2026;">
+      <div v-for="m in pagedMembers" :key="m.id" class="rs-member-row" style="display: grid; grid-template-columns: 40px 1fr auto auto auto; gap: 10px; align-items: center; padding: 12px 18px; border-bottom: 1px solid #1c2026;">
 
         <!-- Avatar -->
         <div style="width:38px; height:38px; border-radius:50%; background:#1c2128; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; color:#5bb8f5; flex-shrink:0;">
@@ -319,7 +319,7 @@ async function saveMembership() {
         </div>
 
         <!-- Rank + Pass badges -->
-        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
+        <div class="rs-member-badges" style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
           <RankBadge :rank="m.rank" />
           <span v-if="m.weeklyPassExpiry && new Date(m.weeklyPassExpiry) > new Date()"
             style="font-size:10px; color:#8ee0ab; border:1px solid #245a34; border-radius:4px; padding:2px 6px; white-space:nowrap;">
@@ -328,7 +328,7 @@ async function saveMembership() {
         </div>
 
         <!-- Primary actions -->
-        <div style="display:flex; gap:6px; flex-shrink:0;">
+        <div class="rs-member-actions-primary" style="display:flex; gap:6px; flex-shrink:0;">
           <button v-if="m.membershipTier === 'regular' || m.membershipCategory === 'regular'"
             class="rs-btn-secondary" style="font-size:11.5px; padding:5px 10px;"
             @click="weeklyPassFor=m">Pass</button>
@@ -337,7 +337,7 @@ async function saveMembership() {
         </div>
 
         <!-- Secondary actions -->
-        <div style="display:flex; gap:6px; flex-shrink:0;">
+        <div class="rs-member-actions-secondary" style="display:flex; gap:6px; flex-shrink:0;">
           <button class="rs-btn-secondary" style="font-size:11.5px; padding:5px 10px;" @click="idCardFor=m">ID card</button>
           <button class="rs-btn-secondary" style="font-size:11.5px; padding:5px 10px;" @click="resetCredentials(m.id)">Reset</button>
           <button v-if="user?.role === 'superadmin'"
