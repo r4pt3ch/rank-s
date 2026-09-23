@@ -29,9 +29,9 @@ const navByRole = {
   superadmin: [
     { to: "/",         label: "Dashboard" },
     { to: "/checkin",  label: "Check-in" },
+    { to: "/pos",      label: "Point-of-Sale" },
     { to: "/members",  label: "Gym members" },
     { to: "/receipts", label: "Receipts" },
-    { to: "/pos",      label: "POS / inventory" },
     { to: "/reports",  label: "Reports" },
     { to: "/monitor",  label: "Lobby monitor" },
     { to: "/membership-plans", label: "Settings", hasChildren: true },
@@ -43,9 +43,9 @@ const navByRole = {
   admin: [
     { to: "/",         label: "Dashboard" },
     { to: "/checkin",  label: "Check-in" },
+    { to: "/pos",      label: "Point-of-Sale" },
     { to: "/members",  label: "Gym members" },
     { to: "/receipts", label: "Receipts" },
-    { to: "/pos",      label: "POS / inventory" },
     { to: "/reports",  label: "Reports" },
     { to: "/monitor",  label: "Lobby monitor" },
     { to: "/membership-plans", label: "Settings", hasChildren: true },
@@ -54,9 +54,9 @@ const navByRole = {
   user: [
     { to: "/",         label: "Dashboard" },
     { to: "/checkin",  label: "Check-in" },
+    { to: "/pos",      label: "Point-of-Sale" },
     { to: "/members",  label: "Gym members" },
     { to: "/receipts", label: "Receipts" },
-    { to: "/pos",      label: "POS / inventory" },
     { to: "/reports",  label: "Reports" },
     { to: "/monitor",  label: "Lobby monitor" },
     { to: "/account",  label: "My account" },
