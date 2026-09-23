@@ -12,6 +12,10 @@ function serialize(doc: any) {
     lobbyDisplayMinutes:   doc.lobbyDisplayMinutes,
     lobbyResetAt:          doc.lobbyResetAt,
     utcOffset:             doc.utcOffset ?? 8,
+    nonMemberWeeklyPassStudent:    doc.nonMemberWeeklyPassStudent ?? 0,
+    nonMemberWeeklyPassNonStudent: doc.nonMemberWeeklyPassNonStudent ?? 0,
+    nonMemberMonthlyPassStudent:   doc.nonMemberMonthlyPassStudent ?? 0,
+    nonMemberMonthlyPassNonStudent:doc.nonMemberMonthlyPassNonStudent ?? 0,
   };
 }
 
@@ -73,6 +77,10 @@ export default defineEventHandler(async (event) => {
     if (body.utcOffset !== undefined) {
       doc.utcOffset = Number(body.utcOffset);
       changes.push(`timezone UTC${Number(body.utcOffset) >= 0 ? "+" : ""}${body.utcOffset}`);
+    }
+    const passFields = ["nonMemberWeeklyPassStudent","nonMemberWeeklyPassNonStudent","nonMemberMonthlyPassStudent","nonMemberMonthlyPassNonStudent"] as const;
+    for (const f of passFields) {
+      if (body[f] !== undefined) { (doc as any)[f] = Number(body[f]) || 0; }
     }
 
     await doc.save();

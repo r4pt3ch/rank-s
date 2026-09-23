@@ -15,6 +15,12 @@ const SettingsSchema = new Schema({
 
   // Timezone (UTC offset hours, e.g. 8 for Asia/Manila UTC+8)
   utcOffset: { type: Number, default: 8 },
+
+  // Non-member passes
+  nonMemberWeeklyPassStudent:    { type: Number, default: 0 },
+  nonMemberWeeklyPassNonStudent: { type: Number, default: 0 },
+  nonMemberMonthlyPassStudent:   { type: Number, default: 0 },
+  nonMemberMonthlyPassNonStudent:{ type: Number, default: 0 },
 });
 
 export default mongoose.models.Settings || mongoose.model("Settings", SettingsSchema);

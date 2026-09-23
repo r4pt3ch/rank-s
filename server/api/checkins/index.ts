@@ -54,9 +54,10 @@ export default defineEventHandler(async (event) => {
       pin: body.pin,
       walkinName: body.name,
       walkinStudentType: body.studentType || "non-student",
+      walkinPassType: body.passType || "daily",
       issuedBy: user,
       source: "staff",
-    });
+    } as any);
     return result;
   }
 

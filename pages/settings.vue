@@ -8,6 +8,10 @@ const walkInFeeNonStudent = ref(data.value?.walkInFeeNonStudent ?? 60);
 const lobbyAutoClearEnabled = ref(data.value?.lobbyAutoClearEnabled ?? false);
 const lobbyDisplayMinutes   = ref(data.value?.lobbyDisplayMinutes ?? 60);
 const utcOffset             = ref(data.value?.utcOffset ?? 8);
+const nonMemberWeeklyPassStudent    = ref(data.value?.nonMemberWeeklyPassStudent ?? 0);
+const nonMemberWeeklyPassNonStudent = ref(data.value?.nonMemberWeeklyPassNonStudent ?? 0);
+const nonMemberMonthlyPassStudent   = ref(data.value?.nonMemberMonthlyPassStudent ?? 0);
+const nonMemberMonthlyPassNonStudent = ref(data.value?.nonMemberMonthlyPassNonStudent ?? 0);
 
 const saved    = ref(false);
 const error    = ref("");
@@ -26,6 +30,10 @@ async function save() {
         lobbyAutoClearEnabled: lobbyAutoClearEnabled.value,
         lobbyDisplayMinutes: lobbyDisplayMinutes.value,
         utcOffset: utcOffset.value,
+        nonMemberWeeklyPassStudent: nonMemberWeeklyPassStudent.value,
+        nonMemberWeeklyPassNonStudent: nonMemberWeeklyPassNonStudent.value,
+        nonMemberMonthlyPassStudent: nonMemberMonthlyPassStudent.value,
+        nonMemberMonthlyPassNonStudent: nonMemberMonthlyPassNonStudent.value,
       },
     });
     saved.value = true;
@@ -113,6 +121,23 @@ async function clearLobbyNow() {
       <div v-if="lobbyAutoClearEnabled" style="margin-bottom:16px;">
         <label style="font-size:12px; color:#9aa1ab; display:block; margin-bottom:6px;">Display duration (minutes)</label>
         <input v-model.number="lobbyDisplayMinutes" type="number" min="1" class="rs-input" />
+      </div>
+
+      <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">Non-member passes</div>
+      <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 12px;">Optional weekly and monthly pass prices for walk-in clients. Set to 0 to hide the option at check-in.</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 6px;">
+        <div style="font-size:11.5px; color:#5d6470; text-align:center;">Student</div>
+        <div style="font-size:11.5px; color:#5d6470; text-align:center;">Non-student</div>
+      </div>
+      <div style="font-size:12px; color:#9aa1ab; margin-bottom:6px;">Weekly pass (₱)</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+        <input v-model.number="nonMemberWeeklyPassStudent" type="number" min="0" class="rs-input" />
+        <input v-model.number="nonMemberWeeklyPassNonStudent" type="number" min="0" class="rs-input" />
+      </div>
+      <div style="font-size:12px; color:#9aa1ab; margin-bottom:6px;">Monthly pass (₱)</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+        <input v-model.number="nonMemberMonthlyPassStudent" type="number" min="0" class="rs-input" />
+        <input v-model.number="nonMemberMonthlyPassNonStudent" type="number" min="0" class="rs-input" />
       </div>
 
       <div v-if="error" style="color:#e36b6b; font-size:12.5px; margin-bottom:10px;">{{ error }}</div>

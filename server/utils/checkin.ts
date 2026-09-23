@@ -25,6 +25,7 @@ export async function performCheckIn(opts: {
   pin?: string;
   walkinName?: string;
   walkinStudentType?: "student" | "non-student";
+  walkinPassType?: "daily" | "weekly" | "monthly";
   issuedBy?: { id?: string; name: string } | null;
   source: "staff" | "kiosk";
 }) {
@@ -187,16 +188,33 @@ export async function performCheckIn(opts: {
     };
   }
 
-  // walk-in — staff selects student or non-student
+  // walk-in — staff selects student/non-student and pass type
   const name = opts.walkinName || "Walk-in guest";
   const walkinStudentType = opts.walkinStudentType || "non-student";
-  const fee = walkinStudentType === "student" ? settings.walkInFeeStudent : settings.walkInFeeNonStudent;
+  const passType = (opts as any).walkinPassType || "daily";
+
+  let fee = 0;
+  let feeLabel = "";
+  if (passType === "weekly") {
+    fee = walkinStudentType === "student"
+      ? ((settings as any).nonMemberWeeklyPassStudent || 0)
+      : ((settings as any).nonMemberWeeklyPassNonStudent || 0);
+    feeLabel = `Non-member weekly pass (${walkinStudentType}) - ${name}`;
+  } else if (passType === "monthly") {
+    fee = walkinStudentType === "student"
+      ? ((settings as any).nonMemberMonthlyPassStudent || 0)
+      : ((settings as any).nonMemberMonthlyPassNonStudent || 0);
+    feeLabel = `Non-member monthly pass (${walkinStudentType}) - ${name}`;
+  } else {
+    fee = walkinStudentType === "student" ? settings.walkInFeeStudent : settings.walkInFeeNonStudent;
+    feeLabel = `Walk-in entrance (${walkinStudentType}) - ${name}`;
+  }
 
   let receiptId = null;
   if (fee > 0) {
     const receipt = await Receipt.create({
       name,
-      items: [{ name: `Walk-in entrance fee (${walkinStudentType}) - ${name}`, price: fee, qty: 1 }],
+      items: [{ name: feeLabel, price: fee, qty: 1 }],
       total: fee,
       issuedBy: opts.issuedBy?.id || null,
       kind: "visit",
@@ -218,7 +236,7 @@ export async function performCheckIn(opts: {
 
   await logAudit(
     opts.issuedBy || { name: opts.source === "kiosk" ? "Kiosk" : "system" },
-    `Walk-in check-in: "${name}" (${walkinStudentType}) (fee ₱${fee})`
+    `Walk-in check-in: "${name}" (${walkinStudentType}, ${passType}) (fee ₱${fee})`
   );
 
   return { id: String(checkin._id), name, rank: null, fee, billedAs: "walkin", duplicateVisit: false, studentType: walkinStudentType };
