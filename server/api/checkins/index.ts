@@ -1,7 +1,9 @@
 import CheckIn from "../../utils/models/CheckIn";
+import Settings from "../../utils/models/Settings";
 import { connectDB } from "../../utils/db";
 import { requireRole } from "../../utils/auth";
 import { performCheckIn } from "../../utils/checkin";
+import { getTodayRange } from "../../utils/helpers";
 
 export default defineEventHandler(async (event) => {
   await connectDB();
@@ -12,9 +14,9 @@ export default defineEventHandler(async (event) => {
     const query = getQuery(event);
     const filter: Record<string, any> = {};
     if (query.today === "1") {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      filter.createdAt = { $gte: start };
+      const settings = await Settings.findOne({ key: "default" }).lean();
+      const { start, end } = getTodayRange(settings?.utcOffset ?? 8);
+      filter.createdAt = { $gte: start, $lte: end };
     }
     const checkins = await CheckIn.find(filter)
       .sort({ createdAt: -1 })

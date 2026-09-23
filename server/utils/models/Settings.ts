@@ -12,6 +12,9 @@ const SettingsSchema = new Schema({
   lobbyAutoClearEnabled: { type: Boolean, default: false },
   lobbyDisplayMinutes:   { type: Number, default: 60 },
   lobbyResetAt:          { type: Date, default: null },
+
+  // Timezone (UTC offset hours, e.g. 8 for Asia/Manila UTC+8)
+  utcOffset: { type: Number, default: 8 },
 });
 
 export default mongoose.models.Settings || mongoose.model("Settings", SettingsSchema);

@@ -11,6 +11,7 @@ function serialize(doc: any) {
     lobbyAutoClearEnabled: doc.lobbyAutoClearEnabled,
     lobbyDisplayMinutes:   doc.lobbyDisplayMinutes,
     lobbyResetAt:          doc.lobbyResetAt,
+    utcOffset:             doc.utcOffset ?? 8,
   };
 }
 
@@ -68,6 +69,10 @@ export default defineEventHandler(async (event) => {
       }
       doc.lobbyDisplayMinutes = minutes;
       changes.push(`lobby display duration to ${minutes} min`);
+    }
+    if (body.utcOffset !== undefined) {
+      doc.utcOffset = Number(body.utcOffset);
+      changes.push(`timezone UTC${Number(body.utcOffset) >= 0 ? "+" : ""}${body.utcOffset}`);
     }
 
     await doc.save();

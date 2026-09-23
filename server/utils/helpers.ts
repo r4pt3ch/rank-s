@@ -106,3 +106,13 @@ export function maskName(fullName: string) {
   const lastInitial = parts[parts.length - 1][0];
   return `${first} ${lastInitial}.`;
 }
+
+export function getTodayRange(utcOffset: number = 8): { start: Date; end: Date } {
+  const offsetMs = utcOffset * 60 * 60 * 1000;
+  const now = new Date();
+  const localNow = new Date(now.getTime() + offsetMs);
+  const midnight = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate()));
+  const start = new Date(midnight.getTime() - offsetMs);
+  const end   = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+  return { start, end };
+}

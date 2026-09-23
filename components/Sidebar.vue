@@ -2,49 +2,53 @@
 const { user, logout } = useAuth();
 const route = useRoute();
 
+// Sub-settings pages — shown under Settings as child links
+const settingsChildren = [
+  { to: "/membership-plans", label: "Membership plans" },
+  { to: "/services",         label: "Services" },
+  { to: "/inventory",        label: "Inventory settings" },
+  { to: "/thresholds",       label: "Rank thresholds" },
+];
+const settingsChildPaths = settingsChildren.map((c) => c.to);
+const settingsOpen = computed(() =>
+  route.path === "/settings" || settingsChildPaths.includes(route.path)
+);
+
 const navByRole = {
   superadmin: [
-    { to: "/", label: "Dashboard" },
-    { to: "/members", label: "Gym members" },
-    { to: "/membership-plans", label: "Membership plans" },
-    { to: "/checkin", label: "Check-in" },
-    { to: "/services", label: "Services" },
+    { to: "/",         label: "Dashboard" },
+    { to: "/checkin",  label: "Check-in" },
+    { to: "/members",  label: "Gym members" },
     { to: "/receipts", label: "Receipts" },
-    { to: "/pos", label: "POS / inventory" },
-    { to: "/inventory", label: "Inventory settings" },
-    { to: "/reports", label: "Reports" },
-    { to: "/thresholds", label: "Rank thresholds" },
-    { to: "/settings", label: "Settings" },
-    { to: "/users", label: "User accounts" },
-    { to: "/audit", label: "Audit trail" },
-    { to: "/loginlogs", label: "Login logs" },
-    { to: "/monitor", label: "Lobby monitor" },
-    { to: "/account", label: "My account" },
+    { to: "/pos",      label: "POS / inventory" },
+    { to: "/reports",  label: "Reports" },
+    { to: "/monitor",  label: "Lobby monitor" },
+    { to: "/settings", label: "Settings", children: settingsChildren },
+    { to: "/users",    label: "User accounts" },
+    { to: "/audit",    label: "Audit trail" },
+    { to: "/loginlogs",label: "Login logs" },
+    { to: "/account",  label: "My account" },
   ],
   admin: [
-    { to: "/", label: "Dashboard" },
-    { to: "/members", label: "Gym members" },
-    { to: "/membership-plans", label: "Membership plans" },
-    { to: "/checkin", label: "Check-in" },
-    { to: "/services", label: "Services" },
+    { to: "/",         label: "Dashboard" },
+    { to: "/checkin",  label: "Check-in" },
+    { to: "/members",  label: "Gym members" },
     { to: "/receipts", label: "Receipts" },
-    { to: "/pos", label: "POS / inventory" },
-    { to: "/inventory", label: "Inventory settings" },
-    { to: "/reports", label: "Reports" },
-    { to: "/thresholds", label: "Rank thresholds" },
-    { to: "/settings", label: "Settings" },
-    { to: "/monitor", label: "Lobby monitor" },
-    { to: "/account", label: "My account" },
+    { to: "/pos",      label: "POS / inventory" },
+    { to: "/reports",  label: "Reports" },
+    { to: "/monitor",  label: "Lobby monitor" },
+    { to: "/settings", label: "Settings", children: settingsChildren },
+    { to: "/account",  label: "My account" },
   ],
   user: [
-    { to: "/", label: "Dashboard" },
-    { to: "/members", label: "Gym members" },
-    { to: "/checkin", label: "Check-in" },
+    { to: "/",         label: "Dashboard" },
+    { to: "/checkin",  label: "Check-in" },
+    { to: "/members",  label: "Gym members" },
     { to: "/receipts", label: "Receipts" },
-    { to: "/pos", label: "POS / inventory" },
-    { to: "/reports", label: "Reports" },
-    { to: "/monitor", label: "Lobby monitor" },
-    { to: "/account", label: "My account" },
+    { to: "/pos",      label: "POS / inventory" },
+    { to: "/reports",  label: "Reports" },
+    { to: "/monitor",  label: "Lobby monitor" },
+    { to: "/account",  label: "My account" },
   ],
   member: [{ to: "/profile", label: "My profile" }],
 };
@@ -62,22 +66,49 @@ const roleLabel = computed(() => ({ superadmin: "Super admin", admin: "Regular a
         <div style="font-size: 11px; color: #6b7280;">Fitness gym</div>
       </div>
     </div>
+
     <div style="flex: 1;">
-      <NuxtLink
-        v-for="n in nav"
-        :key="n.to"
-        :to="n.to"
-        style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 4px; border-radius: 8px; text-decoration: none; font-size: 13.5px;"
-        :style="{ background: route.path === n.to ? '#1c2128' : 'transparent', color: route.path === n.to ? '#5bb8f5' : '#aab0bb', fontWeight: route.path === n.to ? 600 : 500 }"
-      >
-        {{ n.label }}
-      </NuxtLink>
+      <template v-for="n in nav" :key="n.to">
+        <!-- Nav item with children (Settings) -->
+        <template v-if="n.children">
+          <NuxtLink
+            :to="n.to"
+            style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 2px; border-radius: 8px; text-decoration: none; font-size: 13.5px;"
+            :style="{ background: route.path === n.to ? '#1c2128' : settingsOpen ? '#161b22' : 'transparent', color: settingsOpen ? '#5bb8f5' : '#aab0bb', fontWeight: settingsOpen ? 600 : 500 }"
+          >
+            {{ n.label }}
+            <span style="margin-left: auto; font-size: 10px; color: #5d6470;">{{ settingsOpen ? '▾' : '▸' }}</span>
+          </NuxtLink>
+          <!-- Sub-items shown when settings is open -->
+          <div v-if="settingsOpen" style="margin-bottom: 4px;">
+            <NuxtLink
+              v-for="c in n.children" :key="c.to"
+              :to="c.to"
+              style="display: flex; align-items: center; padding: 8px 12px 8px 28px; margin-bottom: 2px; border-radius: 8px; text-decoration: none; font-size: 12.5px;"
+              :style="{ background: route.path === c.to ? '#1c2128' : 'transparent', color: route.path === c.to ? '#5bb8f5' : '#7a8190', fontWeight: route.path === c.to ? 600 : 400 }"
+            >
+              {{ c.label }}
+            </NuxtLink>
+          </div>
+        </template>
+        <!-- Regular nav item -->
+        <NuxtLink
+          v-else
+          :to="n.to"
+          style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 4px; border-radius: 8px; text-decoration: none; font-size: 13.5px;"
+          :style="{ background: route.path === n.to ? '#1c2128' : 'transparent', color: route.path === n.to ? '#5bb8f5' : '#aab0bb', fontWeight: route.path === n.to ? 600 : 500 }"
+        >
+          {{ n.label }}
+        </NuxtLink>
+      </template>
     </div>
-    <div v-if="user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'user'" style="border-top: 1px solid #1f242c; padding-top: 14px; margin-top: 14px;">
+
+    <div v-if="user?.role !== 'member'" style="border-top: 1px solid #1f242c; padding-top: 14px; margin-top: 14px;">
       <a href="/lobby" target="_blank" style="display: block; font-size: 11.5px; color: #5bb8f5; text-decoration: none; margin-bottom: 6px;">Open lobby display ↗</a>
       <a href="/kiosk" target="_blank" style="display: block; font-size: 11.5px; color: #5bb8f5; text-decoration: none; margin-bottom: 6px;">Open self-check-in kiosk ↗</a>
       <a href="/member-login" target="_blank" style="display: block; font-size: 11.5px; color: #5bb8f5; text-decoration: none; margin-bottom: 12px;">Open member account login ↗</a>
     </div>
+
     <div style="border-top: 1px solid #1f242c; padding-top: 14px; margin-top: 0;">
       <div style="font-size: 13px; font-weight: 600;">{{ user?.name }}</div>
       <div style="font-size: 11.5px; color: #6b7280; margin-bottom: 10px;">{{ roleLabel }}</div>

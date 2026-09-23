@@ -9,6 +9,7 @@ const walkInFeeStudent    = ref(data.value?.walkInFeeStudent ?? 40);
 const walkInFeeNonStudent = ref(data.value?.walkInFeeNonStudent ?? 60);
 const lobbyAutoClearEnabled = ref(data.value?.lobbyAutoClearEnabled ?? false);
 const lobbyDisplayMinutes   = ref(data.value?.lobbyDisplayMinutes ?? 60);
+const utcOffset             = ref(data.value?.utcOffset ?? 8);
 
 // Receipt settings
 const form = ref({ ...receiptData.value });
@@ -32,6 +33,7 @@ async function saveGym() {
         walkInFeeNonStudent: walkInFeeNonStudent.value,
         lobbyAutoClearEnabled: lobbyAutoClearEnabled.value,
         lobbyDisplayMinutes: lobbyDisplayMinutes.value,
+        utcOffset: utcOffset.value,
       },
     });
     saved.value = "gym";
@@ -88,6 +90,43 @@ const receiptToggles = [
     <!-- Section: Gym settings -->
     <div style="font-size: 11px; font-weight: 700; color: #5d6470; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;">Gym settings</div>
     <div class="rs-card" style="max-width: 500px; margin-bottom: 18px;">
+      <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">Time zone</div>
+      <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 12px;">Used to determine "today" for check-ins, the dashboard, and daily reports. Set to match your gym's local time.</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+        <div>
+          <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">UTC offset (hours)</label>
+          <select v-model.number="utcOffset" class="rs-input">
+            <option :value="-12">UTC-12</option>
+            <option :value="-11">UTC-11</option>
+            <option :value="-10">UTC-10 (Hawaii)</option>
+            <option :value="-9">UTC-9 (Alaska)</option>
+            <option :value="-8">UTC-8 (Los Angeles)</option>
+            <option :value="-7">UTC-7 (Denver)</option>
+            <option :value="-6">UTC-6 (Chicago)</option>
+            <option :value="-5">UTC-5 (New York)</option>
+            <option :value="-4">UTC-4 (Atlantic)</option>
+            <option :value="-3">UTC-3 (São Paulo)</option>
+            <option :value="0">UTC+0 (London)</option>
+            <option :value="1">UTC+1 (Paris)</option>
+            <option :value="2">UTC+2 (Cairo)</option>
+            <option :value="3">UTC+3 (Moscow)</option>
+            <option :value="4">UTC+4 (Dubai)</option>
+            <option :value="5">UTC+5 (Karachi)</option>
+            <option :value="5.5">UTC+5:30 (Mumbai)</option>
+            <option :value="6">UTC+6 (Dhaka)</option>
+            <option :value="7">UTC+7 (Bangkok)</option>
+            <option :value="8">UTC+8 (Manila / Singapore / Beijing)</option>
+            <option :value="9">UTC+9 (Tokyo / Seoul)</option>
+            <option :value="10">UTC+10 (Sydney)</option>
+            <option :value="11">UTC+11 (Noumea)</option>
+            <option :value="12">UTC+12 (Auckland)</option>
+          </select>
+        </div>
+        <div style="padding-top:24px; font-size:12.5px; color:#aab0bb;">
+          Current local time: <b>{{ new Date(Date.now() + utcOffset * 3600000).toISOString().replace("T", " ").slice(0, 16) }}</b>
+        </div>
+      </div>
+
       <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">Points per check-in</div>
       <p style="font-size: 12.5px; color: #8a909b; margin: 0 0 10px;">Points earned by a member each time they check in.</p>
       <input v-model.number="pointsPerCheckIn" type="number" min="0" class="rs-input" style="margin-bottom: 20px;" />

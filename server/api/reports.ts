@@ -1,17 +1,27 @@
 import CheckIn from "../utils/models/CheckIn";
 import Receipt from "../utils/models/Receipt";
+import Settings from "../utils/models/Settings";
 import { connectDB } from "../utils/db";
 import { requireRole } from "../utils/auth";
+import { getTodayRange } from "../utils/helpers";
 
-function getRange(period: string, customStart?: string, customEnd?: string) {
+function getRange(period: string, utcOffset: number, customStart?: string, customEnd?: string) {
   const now = new Date();
-  const start = new Date(now);
+  const offsetMs = utcOffset * 60 * 60 * 1000;
+
+  function startOfDayUtc(d: Date): Date {
+    const local = new Date(d.getTime() + offsetMs);
+    const midnight = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()));
+    return new Date(midnight.getTime() - offsetMs);
+  }
+
+  function endOfDayUtc(d: Date): Date {
+    return new Date(startOfDayUtc(d).getTime() + 24 * 60 * 60 * 1000 - 1);
+  }
 
   if (period === "custom") {
-    const s = customStart ? new Date(customStart) : new Date(0);
-    const e = customEnd ? new Date(customEnd) : now;
-    s.setHours(0, 0, 0, 0);
-    e.setHours(23, 59, 59, 999);
+    const s = customStart ? startOfDayUtc(new Date(customStart)) : new Date(0);
+    const e = customEnd   ? endOfDayUtc(new Date(customEnd))     : now;
     if (isNaN(s.getTime()) || isNaN(e.getTime())) {
       throw createError({ statusCode: 400, statusMessage: "Invalid custom date range." });
     }
@@ -21,19 +31,23 @@ function getRange(period: string, customStart?: string, customEnd?: string) {
     return { start: s, end: e };
   }
 
-  if (period === "alltime") {
-    return { start: new Date(0), end: now };
-  } else if (period === "weekly") {
-    start.setDate(start.getDate() - 6);
-    start.setHours(0, 0, 0, 0);
-  } else if (period === "monthly") {
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
-  } else {
-    // daily
-    start.setHours(0, 0, 0, 0);
+  if (period === "alltime") return { start: new Date(0), end: now };
+
+  const todayStart = startOfDayUtc(now);
+  if (period === "daily") return { start: todayStart, end: now };
+
+  if (period === "weekly") {
+    const weekStart = new Date(todayStart.getTime() - 6 * 24 * 60 * 60 * 1000);
+    return { start: weekStart, end: now };
   }
-  return { start, end: now };
+
+  if (period === "monthly") {
+    const localNow = new Date(now.getTime() + offsetMs);
+    const monthStart = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), 1));
+    return { start: new Date(monthStart.getTime() - offsetMs), end: now };
+  }
+
+  return { start: todayStart, end: now };
 }
 
 function dayKey(date: Date) {
@@ -44,9 +58,12 @@ export default defineEventHandler(async (event) => {
   await connectDB();
   await requireRole(event, ["superadmin", "admin", "user"]);
 
+  const settings = await Settings.findOne({ key: "default" }).lean();
+  const utcOffset = (settings as any)?.utcOffset ?? 8;
+
   const query = getQuery(event);
   const period = ["daily", "weekly", "monthly", "alltime", "custom"].includes(String(query.period)) ? String(query.period) : "daily";
-  const { start, end } = getRange(period, query.start as string | undefined, query.end as string | undefined);
+  const { start, end } = getRange(period, utcOffset, query.start as string | undefined, query.end as string | undefined);
 
   const [checkins, receipts] = await Promise.all([
     CheckIn.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
