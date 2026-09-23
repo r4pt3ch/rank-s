@@ -45,7 +45,17 @@ const groupedReceipts = computed(() => {
       groups.push({ name: r.name, items: [...r.items], total: r.total, time: r.time, issuedBy: r.issuedBy, ids: [r.id] });
     }
   }
-  return groups.slice(0, 20);
+  return groups;
+});
+
+const PER_PAGE = 15;
+const receiptPage = ref(1);
+const totalReceiptPages = computed(() => Math.max(1, Math.ceil(groupedReceipts.value.length / PER_PAGE)));
+const pagedReceipts = computed(() => {
+  const start = (receiptPage.value - 1) * PER_PAGE;
+  return groupedReceipts.value.slice(start, start + PER_PAGE);
+});
+watch(groupedReceipts, () => { receiptPage.value = 1; });
 });
 
 function reprint(r) {
@@ -81,7 +91,7 @@ function reprint(r) {
       <div class="rs-card">
         <div style="font-weight: 700; font-size: 14px; margin-bottom: 12px;">Recent receipts</div>
         <div v-if="!receipts?.length" style="font-size: 13px; color: #5d6470; padding: 18px 0; text-align: center;">No receipts issued yet.</div>
-        <div v-for="g in groupedReceipts" :key="g.ids[0]" style="padding: 10px 0; border-bottom: 1px solid #1c2026;">
+        <div v-for="g in pagedReceipts" :key="g.ids[0]" style="padding: 10px 0; border-bottom: 1px solid #1c2026;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="font-weight: 600; font-size: 13px;">{{ g.name }}</span>
             <span style="font-weight: 700; font-size: 13px;">₱{{ g.total.toLocaleString() }}</span>
@@ -97,6 +107,7 @@ function reprint(r) {
             <button class="rs-btn-secondary" style="padding: 3px 8px; font-size: 11px;" @click="reprint({ id: g.ids[0], name: g.name, items: g.items, total: g.total, time: g.time, issuedBy: g.issuedBy })">Print</button>
           </div>
         </div>
+        <Pagination :page="receiptPage" :totalPages="totalReceiptPages" :total="groupedReceipts.length" :perPage="PER_PAGE" @prev="receiptPage--" @next="receiptPage++" />
       </div>
     </div>
 

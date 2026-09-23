@@ -11,6 +11,8 @@ const walkinStudentType = ref("non-student");
 const weeklyPassFor = ref(null);
 const weeklyPassResult = ref(null);
 const logSearch = ref("");
+const LOG_PER_PAGE = 20;
+const logPage = ref(1);
 
 const filteredLog = computed(() => {
   const list = checkins.value || [];
@@ -18,6 +20,13 @@ const filteredLog = computed(() => {
   const q = logSearch.value.toLowerCase();
   return list.filter((c) => c.name.toLowerCase().includes(q));
 });
+
+const totalLogPages = computed(() => Math.max(1, Math.ceil(filteredLog.value.length / LOG_PER_PAGE)));
+const pagedLog = computed(() => {
+  const start = (logPage.value - 1) * LOG_PER_PAGE;
+  return filteredLog.value.slice(start, start + LOG_PER_PAGE);
+});
+watch(filteredLog, () => { logPage.value = 1; });
 const feedback = ref(null);
 
 // services modal state
@@ -239,7 +248,7 @@ async function purchaseWeeklyPass() {
         <input v-model="logSearch" class="rs-input" placeholder="Search by name..." style="margin-bottom:10px; font-size:13px;" />
         <div v-if="!checkins?.length" style="font-size: 13px; color: #5d6470; padding: 18px 0; text-align: center;">No check-ins yet.</div>
         <div v-else-if="filteredLog.length === 0" style="font-size: 13px; color: #5d6470; padding: 14px 0; text-align: center;">No results for "{{ logSearch }}".</div>
-        <div v-for="c in filteredLog" :key="c.id" style="display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid #1c2026;"
+        <div v-for="c in pagedLog" :key="c.id" style="display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid #1c2026;"
           :style="{ opacity: c.voided ? 0.45 : 1 }">
           <span style="font-size:13px; font-weight:600; flex:1;">{{ c.name }}</span>
           <span v-if="c.voided" style="font-size:10px; color:#e88; border:1px solid #5a2424; border-radius:4px; padding:2px 5px;">voided</span>
@@ -259,6 +268,7 @@ async function purchaseWeeklyPass() {
           <button v-if="!c.voided && c.voidStatus !== 'pending'" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px;" @click="reopenServices(c)">+ Service</button>
           <button v-if="!c.voided && c.voidStatus !== 'pending'" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px; color:#e88;" @click="requestVoid(c)">Void</button>
         </div>
+        <Pagination :page="logPage" :totalPages="totalLogPages" :total="filteredLog.length" :perPage="LOG_PER_PAGE" @prev="logPage--" @next="logPage++" />
       </div>
     </div>
 

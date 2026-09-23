@@ -90,6 +90,10 @@ const addError = ref("");
 
 const filterTab = ref("all"); // 'all' | 'expired' | 'expiring' | 'archived'
 
+const MEMBERS_PER_PAGE = 20;
+const membersPage = ref(1);
+watch([query, filterTab], () => { membersPage.value = 1; });
+
 // Archive / restore
 const archiveFor   = ref(null);
 const archiveReason = ref("");
@@ -140,6 +144,12 @@ const filterCounts = computed(() => {
       return exp >= now && exp <= in3days;
     }).length,
   };
+});
+
+const totalMemberPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / MEMBERS_PER_PAGE)));
+const pagedMembers = computed(() => {
+  const start = (membersPage.value - 1) * MEMBERS_PER_PAGE;
+  return filtered.value.slice(start, start + MEMBERS_PER_PAGE);
 });
 
 function statusLabel(m) {
@@ -290,7 +300,7 @@ async function saveMembership() {
 
     <div v-if="filterTab !== 'archived'" class="rs-card" style="padding: 0;">
       <div v-if="!filtered.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No members found.</div>
-      <div v-for="m in filtered" :key="m.id" style="display: grid; grid-template-columns: 40px 1fr auto auto auto; gap: 14px; align-items: center; padding: 12px 18px; border-bottom: 1px solid #1c2026;">
+      <div v-for="m in pagedMembers" :key="m.id" style="display: grid; grid-template-columns: 40px 1fr auto auto auto; gap: 14px; align-items: center; padding: 12px 18px; border-bottom: 1px solid #1c2026;">
 
         <!-- Avatar -->
         <div style="width:38px; height:38px; border-radius:50%; background:#1c2128; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; color:#5bb8f5; flex-shrink:0;">
@@ -335,6 +345,7 @@ async function saveMembership() {
             @click="archiveFor=m; archiveReason=''; archiveError=''">Archive</button>
         </div>
       </div>
+      <Pagination :page="membersPage" :totalPages="totalMemberPages" :total="filtered.length" :perPage="MEMBERS_PER_PAGE" @prev="membersPage--" @next="membersPage++" />
     </div>
 
     <!-- Add member modal -->

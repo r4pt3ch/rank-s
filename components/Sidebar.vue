@@ -72,7 +72,7 @@ const roleLabel = computed(() => ({ superadmin: "Super admin", admin: "Regular a
   <div style="width: 248px; background: #111419; border-right: 1px solid #1f242c; display: flex; flex-direction: column; padding: 24px 16px; min-height: 100vh;">
     <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 28px;">
       <img src="/logo.png" alt="Rank S logo" style="width: 40px; height: 40px; object-fit: contain;" />
-      <div>
+      <div style="flex:1;">
         <div style="font-weight: 800; font-size: 17px; letter-spacing: 0.5px;">RANK S</div>
         <div style="font-size: 11px; color: #6b7280;">Fitness gym</div>
       </div>
