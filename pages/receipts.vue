@@ -56,7 +56,6 @@ const pagedReceipts = computed(() => {
   return groupedReceipts.value.slice(start, start + PER_PAGE);
 });
 watch(groupedReceipts, () => { receiptPage.value = 1; });
-});
 
 function reprint(r) {
   lastReceipt.value = r;
