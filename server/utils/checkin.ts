@@ -229,6 +229,7 @@ export async function performCheckIn(opts: {
     rank: null,
     fee,
     billedAs: "walkin",
+    visitType: passType !== "daily" ? passType : null,
     receipt: receiptId,
     issuedBy: opts.issuedBy?.id || null,
     source: opts.source,

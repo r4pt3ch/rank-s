@@ -16,7 +16,7 @@ const CheckInSchema = new Schema(
     billedAs:      { type: String, enum: ["member", "walkin"], default: "walkin" },
     expiredBilling:{ type: Boolean, default: false },
     duplicateVisit:{ type: Boolean, default: false },
-    visitType:     { type: String, enum: ["daily", "weekly", null], default: null },
+    visitType:     { type: String, enum: ["daily", "weekly", "monthly", null], default: null },
     // Void / modification request
     voided:              { type: Boolean, default: false },
     voidStatus:          { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },

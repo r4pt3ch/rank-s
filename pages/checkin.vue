@@ -293,13 +293,15 @@ async function purchaseWeeklyPass() {
           <!-- Tier badge -->
           <span v-if="c.membershipTier === 'elite'" style="font-size:10px; color:#f3c44b; border:1px solid #5a4a14; border-radius:4px; padding:2px 5px;">Rank S</span>
           <span v-else-if="c.membershipTier === 'regular'" style="font-size:10px; color:#5bb8f5; border:1px solid #1c3a5a; border-radius:4px; padding:2px 5px;">Rank E–A</span>
+          <span v-else-if="c.visitType === 'weekly'" style="font-size:10px; color:#8ee0ab; border:1px solid #245a34; border-radius:4px; padding:2px 5px;">Walk-in · Weekly</span>
+          <span v-else-if="c.visitType === 'monthly'" style="font-size:10px; color:#8ee0ab; border:1px solid #245a34; border-radius:4px; padding:2px 5px;">Walk-in · Monthly</span>
+          <span v-else-if="c.type === 'walkin'" style="font-size:10px; color:#aab0bb; border:1px solid #2a2f38; border-radius:4px; padding:2px 5px;">Walk-in</span>
           <span style="font-size:11.5px; color:#5bb8f5;">
             ₱{{ (c.fee + (c.servicesTotal || 0)).toLocaleString() }}
             <span v-if="c.servicesTotal" style="font-size:10px; color:#7a8190;"> (₱{{ c.fee }} + ₱{{ c.servicesTotal }})</span>
           </span>
           <span style="font-size:11px; color:#7a8190;">{{ new Date(c.time).toLocaleTimeString() }}</span>
           <RankBadge v-if="c.rank" :rank="c.rank" size="sm" />
-          <span v-else style="font-size:10px; color:#f3a8a8; border:1px solid #5a2424; border-radius:4px; padding:2px 5px;">Walk-in</span>
           <button v-if="!c.voided && c.voidStatus !== 'pending'" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px;" @click="reopenServices(c)">+ Service</button>
           <button v-if="!c.voided && c.voidStatus !== 'pending'" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px; color:#e88;" @click="requestVoid(c)">Void</button>
         </div>
