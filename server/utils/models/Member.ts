@@ -20,7 +20,7 @@ const MemberSchema = new Schema(
     membershipTier:     { type: String, enum: ["walkin", "regular", "elite", null], default: null },
     membershipCategory: { type: String, default: null },
     membershipStudentType: { type: String, enum: ["student", "non-student", null], default: null },
-    membershipDuration: { type: String, enum: ["monthly", "quarterly", "sixmonth", "annual", null], default: null },
+    membershipDuration: { type: String, enum: ["weekly", "monthly", "quarterly", "sixmonth", "annual", null], default: null },
     membershipStart:    { type: Date, default: null },
     membershipExpiry:   { type: Date, default: null },
 

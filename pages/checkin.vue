@@ -231,38 +231,6 @@ async function purchaseWeeklyPass() {
               :style="{ background: walkinStudentType==='non-student' ? '#1c2128':'transparent', color: walkinStudentType==='non-student' ? '#5bb8f5':'#aab0bb', borderColor: walkinStudentType==='non-student' ? '#2f8fd6':'#2a2f38' }"
               @click="walkinStudentType='non-student'">Non-student</button>
           </div>
-
-          <!-- Pass type — only show if prices are configured -->
-          <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Visit type</label>
-          <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;">
-            <button class="rs-btn-secondary" style="flex:1; justify-content:center; font-size:12px;"
-              :style="{ background: walkinPassType==='daily' ? '#1c2128':'transparent', color: walkinPassType==='daily' ? '#5bb8f5':'#aab0bb', borderColor: walkinPassType==='daily' ? '#2f8fd6':'#2a2f38' }"
-              @click="walkinPassType='daily'">
-              Daily
-              <span style="font-size:10.5px; opacity:0.7; display:block;">
-                ₱{{ walkinStudentType === 'student' ? (settings?.walkInFeeStudent || 0) : (settings?.walkInFeeNonStudent || 0) }}
-              </span>
-            </button>
-            <button v-if="(walkinStudentType === 'student' ? settings?.nonMemberWeeklyPassStudent : settings?.nonMemberWeeklyPassNonStudent) > 0"
-              class="rs-btn-secondary" style="flex:1; justify-content:center; font-size:12px;"
-              :style="{ background: walkinPassType==='weekly' ? '#1c2128':'transparent', color: walkinPassType==='weekly' ? '#5bb8f5':'#aab0bb', borderColor: walkinPassType==='weekly' ? '#2f8fd6':'#2a2f38' }"
-              @click="walkinPassType='weekly'">
-              Weekly pass
-              <span style="font-size:10.5px; opacity:0.7; display:block;">
-                ₱{{ walkinStudentType === 'student' ? (settings?.nonMemberWeeklyPassStudent || 0) : (settings?.nonMemberWeeklyPassNonStudent || 0) }}
-              </span>
-            </button>
-            <button v-if="(walkinStudentType === 'student' ? settings?.nonMemberMonthlyPassStudent : settings?.nonMemberMonthlyPassNonStudent) > 0"
-              class="rs-btn-secondary" style="flex:1; justify-content:center; font-size:12px;"
-              :style="{ background: walkinPassType==='monthly' ? '#1c2128':'transparent', color: walkinPassType==='monthly' ? '#5bb8f5':'#aab0bb', borderColor: walkinPassType==='monthly' ? '#2f8fd6':'#2a2f38' }"
-              @click="walkinPassType='monthly'">
-              Monthly pass
-              <span style="font-size:10.5px; opacity:0.7; display:block;">
-                ₱{{ walkinStudentType === 'student' ? (settings?.nonMemberMonthlyPassStudent || 0) : (settings?.nonMemberMonthlyPassNonStudent || 0) }}
-              </span>
-            </button>
-          </div>
-
           <button class="rs-btn-primary" style="width:100%; justify-content:center;" :disabled="!walkinName" @click="checkInWalkIn">Log walk-in</button>
         </template>
 

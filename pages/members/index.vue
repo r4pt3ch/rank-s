@@ -3,7 +3,12 @@ const { user } = useAuth();
 const { data: members, refresh } = await useFetch("/api/members");
 const { data: archivedMembers, refresh: refreshArchived } = await useFetch("/api/members", { query: { archived: "1" } });
 const { data: plans } = await useFetch("/api/membership-plans");
+const { data: gymSettings } = await useFetch("/api/settings");
 
+const WALKIN_DURATIONS = [
+  { id: "weekly",  label: "Weekly pass" },
+  { id: "monthly", label: "Monthly pass" },
+];
 const REGULAR_DURATIONS = [
   { id: "monthly", label: "Monthly" },
   { id: "annual",  label: "Annual" },
@@ -14,9 +19,12 @@ const ELITE_DURATIONS = [
   { id: "sixmonth",  label: "6 Months" },
   { id: "annual",    label: "Annual" },
 ];
-const availableDurations = computed(() =>
-  membershipForm.value.tier === "elite" ? ELITE_DURATIONS : REGULAR_DURATIONS
-);
+const availableDurations = computed(() => {
+  const t = membershipForm.value.tier;
+  if (t === "walkin")  return WALKIN_DURATIONS;
+  if (t === "elite")   return ELITE_DURATIONS;
+  return REGULAR_DURATIONS;
+});
 
 const categories = computed(() => {
   const set = new Set((plans.value || []).map((p) => p.category));
@@ -199,10 +207,12 @@ async function resetCredentials(id) {
 function openMembership(m) {
   membershipFor.value = m;
   const today = new Date().toISOString().slice(0, 10);
+  const tier = m.membershipTier || m.membershipCategory || "regular";
+  const defaultDuration = tier === "walkin" ? "weekly" : tier === "elite" ? "monthly" : "monthly";
   membershipForm.value = {
-    tier: m.membershipTier || m.membershipCategory || "regular",
+    tier,
     studentType: m.membershipStudentType || "non-student",
-    duration: m.membershipDuration || "monthly",
+    duration: m.membershipDuration || defaultDuration,
     includeWeeklyPass: false,
     startDate: today,
     backdated: false,
@@ -495,7 +505,8 @@ async function saveMembership() {
           </button>
         </div>
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Tier</label>
-        <select v-model="membershipForm.tier" class="rs-input" style="margin-bottom: 14px;" @change="membershipForm.duration = 'monthly'">
+        <select v-model="membershipForm.tier" class="rs-input" style="margin-bottom: 14px;" @change="membershipForm.duration = availableDurations[0]?.id || 'monthly'">
+          <option value="walkin">Walk-In (Rank F)</option>
           <option value="regular">Regular Member (Rank E–A)</option>
           <option value="elite">Elite Member (Rank S)</option>
         </select>
@@ -523,12 +534,20 @@ async function saveMembership() {
           Expires: {{ computedExpiry(membershipForm.startDate, membershipForm.duration) }}
         </div>
         <div v-else style="margin-bottom:14px;"></div>
-        <div v-if="matchedPlan" style="font-size: 13px; margin-bottom: 12px;">
+        <div v-if="membershipForm.tier === 'walkin' && membershipForm.duration" style="font-size: 13px; margin-bottom: 12px;">
+          Pass price: <b style="color: #5bb8f5;">
+            ₱{{ membershipForm.duration === 'weekly'
+              ? (membershipForm.studentType === 'student' ? (gymSettings?.nonMemberWeeklyPassStudent || 0) : (gymSettings?.nonMemberWeeklyPassNonStudent || 0))
+              : (membershipForm.studentType === 'student' ? (gymSettings?.nonMemberMonthlyPassStudent || 0) : (gymSettings?.nonMemberMonthlyPassNonStudent || 0))
+            }}
+          </b>
+        </div>
+        <div v-else-if="matchedPlan" style="font-size: 13px; margin-bottom: 12px;">
           Subscription price: <b style="color: #5bb8f5;">₱{{ matchedPlan.price.toLocaleString() }}</b>
           <span v-if="matchedPlan.weeklyFee && membershipForm.tier === 'regular'" style="color:#7a8190; font-size:12px; margin-left:6px;">· Weekly pass: ₱{{ matchedPlan.weeklyFee.toLocaleString() }}</span>
         </div>
 
-        <!-- Optional weekly pass for Regular Members -->
+        <!-- Optional weekly pass for Regular Members only -->
         <div v-if="membershipForm.tier === 'regular' && matchedPlan?.weeklyFee" style="background:#0d0f12; border:1px solid #2a2f38; border-radius:10px; padding:12px; margin-bottom:14px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
             <input type="checkbox" v-model="membershipForm.includeWeeklyPass" style="width:16px; height:16px;" />

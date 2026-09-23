@@ -126,9 +126,13 @@ export async function performCheckIn(opts: {
       feeLabel = `Gym visit (expired membership, billed as walk-in ${studentType}) - ${member.name}`;
     } else if (status === "active") {
       const tier = member.membershipTier || member.membershipCategory;
-      if (tier && member.membershipDuration) {
+      if (tier === "walkin") {
+        // Walk-In tier with active weekly/monthly pass — no per-visit fee
+        fee = 0;
+        billedAs = "member";
+        feeLabel = `Gym visit (Walk-In ${member.membershipDuration} pass) - ${member.name}`;
+      } else if (tier && member.membershipDuration) {
         const plan = await getMembershipPlan(tier, member.membershipDuration, studentType);
-        // If member has an active weekly pass, check-in is free for this visit
         const hasWeeklyPass = member.weeklyPassExpiry && new Date(member.weeklyPassExpiry) > new Date();
         if (hasWeeklyPass) {
           fee = 0;

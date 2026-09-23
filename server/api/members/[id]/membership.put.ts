@@ -1,5 +1,6 @@
 import Member from "../../../utils/models/Member";
 import Receipt from "../../../utils/models/Receipt";
+import Settings from "../../../utils/models/Settings";
 import { connectDB } from "../../../utils/db";
 import { requireRole } from "../../../utils/auth";
 import { computeExpiry, getMembershipPlan, logAudit } from "../../../utils/helpers";
@@ -54,17 +55,38 @@ export default defineEventHandler(async (event) => {
   let saleRecorded = false;
   let saleAmount = 0;
   if (body.recordSale !== false && body.duration) {
-    const plan = await getMembershipPlan(body.tier, body.duration, body.studentType || "non-student");
-    if (plan && plan.price > 0) {
-      await Receipt.create({
-        name: member.name,
-        items: [{ name: `${TIER_LABEL[body.tier]} — ${DURATION_LABELS[body.duration] || body.duration} (${body.studentType || "non-student"})`, price: plan.price, qty: 1 }],
-        total: plan.price,
-        issuedBy: user.id,
-        kind: "membership",
-      });
-      saleRecorded = true;
-      saleAmount = plan.price;
+    if (body.tier === "walkin") {
+      // Walk-In pass prices come from Settings, not MembershipPlan
+      const settings = await Settings.findOne({ key: "default" }).lean() as any;
+      const st = body.studentType || "non-student";
+      const dur = body.duration; // "weekly" or "monthly"
+      let passPrice = 0;
+      if (dur === "weekly")  passPrice = st === "student" ? (settings?.nonMemberWeeklyPassStudent || 0)  : (settings?.nonMemberWeeklyPassNonStudent || 0);
+      if (dur === "monthly") passPrice = st === "student" ? (settings?.nonMemberMonthlyPassStudent || 0) : (settings?.nonMemberMonthlyPassNonStudent || 0);
+      if (passPrice > 0) {
+        await Receipt.create({
+          name: member.name,
+          items: [{ name: `Walk-In ${dur === "weekly" ? "Weekly" : "Monthly"} Pass (${st})`, price: passPrice, qty: 1 }],
+          total: passPrice,
+          issuedBy: user.id,
+          kind: "membership",
+        });
+        saleRecorded = true;
+        saleAmount = passPrice;
+      }
+    } else {
+      const plan = await getMembershipPlan(body.tier, body.duration, body.studentType || "non-student");
+      if (plan && plan.price > 0) {
+        await Receipt.create({
+          name: member.name,
+          items: [{ name: `${TIER_LABEL[body.tier]} — ${DURATION_LABELS[body.duration] || body.duration} (${body.studentType || "non-student"})`, price: plan.price, qty: 1 }],
+          total: plan.price,
+          issuedBy: user.id,
+          kind: "membership",
+        });
+        saleRecorded = true;
+        saleAmount = plan.price;
+      }
     }
   }
 

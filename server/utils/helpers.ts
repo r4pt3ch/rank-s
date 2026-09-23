@@ -69,12 +69,13 @@ export async function genUniquePin() {
 
 export function computeExpiry(start: Date, duration: string) {
   const d = new Date(start);
-  if (duration === "monthly")        d.setMonth(d.getMonth() + 1);
+  if (duration === "weekly")         d.setDate(d.getDate() + 7);
+  else if (duration === "monthly")   d.setMonth(d.getMonth() + 1);
   else if (duration === "quarterly") d.setMonth(d.getMonth() + 3);
   else if (duration === "sixmonth")  d.setMonth(d.getMonth() + 6);
   else if (duration === "annual")    d.setFullYear(d.getFullYear() + 1);
   else if (duration === "lifetime")  return null;
-  d.setHours(23, 59, 59, 999); // end of day so expiry date is inclusive
+  d.setHours(23, 59, 59, 999);
   return d;
 }
 
