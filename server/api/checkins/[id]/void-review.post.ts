@@ -26,21 +26,21 @@ export default defineEventHandler(async (event) => {
     checkin.voidStatus = "approved";
     // Void the main visit fee receipt
     if (checkin.receipt) {
-      await Receipt.findByIdAndUpdate(checkin.receipt, { voided: true });
+      await Receipt.findByIdAndUpdate(checkin.receipt, { $set: { voided: true } });
     }
     // Void all service receipts for this client within 30 minutes of the check-in
     const windowEnd = new Date(checkin.createdAt);
     windowEnd.setMinutes(windowEnd.getMinutes() + 30);
-    await Receipt.updateMany(
+    const serviceVoidResult = await Receipt.updateMany(
       {
         name: checkin.name,
         kind: "pos",
-        voided: false,
+        voided: { $ne: true },
         createdAt: { $gte: checkin.createdAt, $lte: windowEnd },
       },
-      { voided: true }
+      { $set: { voided: true } }
     );
-    await logAudit(user, `Approved void for check-in "${checkin.name}" — check-in fee and services removed from reports`);
+    await logAudit(user, `Approved void for check-in "${checkin.name}" — visit fee and ${serviceVoidResult.modifiedCount} service receipt(s) removed from reports`);
   } else {
     checkin.voidStatus = "rejected";
     checkin.voidRejectionReason = body.rejectionReason?.trim() || null;
