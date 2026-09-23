@@ -1,4 +1,4 @@
-export function usePagination(items: Ref<any[] | null | undefined>, perPage = 20) {
+export function usePagination(items, perPage = 20) {
   const page = ref(1);
 
   const totalPages = computed(() => Math.max(1, Math.ceil((items.value?.length || 0) / perPage)));
@@ -13,7 +13,6 @@ export function usePagination(items: Ref<any[] | null | undefined>, perPage = 20
   function next()  { if (page.value < totalPages.value) page.value++; }
   function prev()  { if (page.value > 1) page.value--; }
 
-  // Reset when list changes (e.g. search/filter)
   watch(items, () => { page.value = 1; });
 
   return { page, totalPages, paged, next, prev, reset };

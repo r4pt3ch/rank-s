@@ -1,41 +1,33 @@
 <script setup>
 const sidebarOpen = ref(false);
 const route = useRoute();
-watch(route, () => { sidebarOpen.value = false; });
+watch(() => route.path, () => { sidebarOpen.value = false; });
 </script>
 
 <template>
-  <div style="display: flex; min-height: 100vh; position: relative;">
+  <div style="display: flex; min-height: 100vh;">
+
     <!-- Mobile overlay -->
-    <div
-      v-if="sidebarOpen"
-      style="position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:40;"
-      @click="sidebarOpen=false"
-    />
+    <Teleport to="body">
+      <div v-if="sidebarOpen" @click="sidebarOpen=false"
+        style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:40;" />
+    </Teleport>
 
     <!-- Sidebar -->
-    <div
-      :style="{
-        transform: sidebarOpen ? 'translateX(0)' : '',
-        position: 'fixed',
-        left: 0,
-        top: 0,
-        bottom: 0,
-        zIndex: 50,
-        transition: 'transform 0.22s ease',
-      }"
-      class="rs-sidebar-wrapper"
-    >
+    <div :class="['rs-sidebar', sidebarOpen ? 'rs-sidebar--open' : '']">
       <Sidebar />
     </div>
 
     <!-- Main content -->
-    <div class="rs-main-content">
+    <div class="rs-content">
       <!-- Mobile topbar -->
-      <div class="rs-mobile-topbar">
-        <button @click="sidebarOpen=!sidebarOpen" style="background:transparent; border:none; color:#aab0bb; cursor:pointer; padding:4px; font-size:22px; line-height:1;">☰</button>
-        <span style="font-weight:800; font-size:16px; letter-spacing:0.5px;">RANK S</span>
-        <div style="width:30px;"></div>
+      <div class="rs-topbar">
+        <button @click="sidebarOpen=!sidebarOpen"
+          style="background:transparent;border:none;color:#aab0bb;cursor:pointer;font-size:22px;line-height:1;padding:0;">
+          ☰
+        </button>
+        <span style="font-weight:800;font-size:16px;letter-spacing:0.5px;">RANK S</span>
+        <div style="width:28px;"></div>
       </div>
       <slot />
     </div>
@@ -43,35 +35,38 @@ watch(route, () => { sidebarOpen.value = false; });
 </template>
 
 <style>
-/* Desktop: sidebar always visible */
-.rs-sidebar-wrapper {
-  position: relative !important;
-  transform: none !important;
-  z-index: auto !important;
+/* Desktop — sidebar always visible inline */
+.rs-sidebar {
+  flex-shrink: 0;
 }
-.rs-mobile-topbar {
+.rs-topbar {
   display: none;
 }
-.rs-main-content {
+.rs-content {
   flex: 1;
   padding: 32px 36px;
+  min-width: 0;
 }
 
-/* Mobile: sidebar slides in/out */
+/* Mobile */
 @media (max-width: 768px) {
-  .rs-sidebar-wrapper {
-    position: fixed !important;
+  .rs-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
     transform: translateX(-100%);
-    z-index: 50 !important;
+    transition: transform 0.22s ease;
+    z-index: 50;
   }
-  .rs-sidebar-wrapper[style*="translateX(0)"] {
-    transform: translateX(0) !important;
+  .rs-sidebar--open {
+    transform: translateX(0);
   }
-  .rs-mobile-topbar {
+  .rs-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 16px;
+    padding: 12px 16px;
     background: #111419;
     border-bottom: 1px solid #1f242c;
     margin: -32px -16px 20px;
@@ -79,9 +74,8 @@ watch(route, () => { sidebarOpen.value = false; });
     top: 0;
     z-index: 30;
   }
-  .rs-main-content {
+  .rs-content {
     padding: 32px 16px;
-    min-width: 0;
     width: 100%;
   }
 }
