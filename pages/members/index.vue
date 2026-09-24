@@ -319,7 +319,10 @@ async function saveMembership() {
 
         <!-- Info -->
         <div style="min-width:0;">
-          <div style="font-weight:700; font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ m.name }}</div>
+          <div style="font-weight:700; font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            {{ m.name }}
+            <span v-if="m.notes" style="font-size:10px; color:#f3c44b; margin-left:4px;" title="Has notes">📝</span>
+          </div>
           <div style="font-size:11.5px; color:#7a8190; margin-top:2px;">
             PIN {{ m.pin }} · {{ m.points }} pts ·
             <span :style="{ color: statusColor(m) }">{{ statusLabel(m) }}</span>
@@ -413,7 +416,10 @@ async function saveMembership() {
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Address</label>
         <input v-model="editing.address" class="rs-input" style="margin-bottom: 14px;" />
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Points</label>
-        <input v-model.number="editing.points" type="number" class="rs-input" style="margin-bottom: 16px;" />
+        <input v-model.number="editing.points" type="number" class="rs-input" style="margin-bottom: 14px;" />
+
+        <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Notes</label>
+        <textarea v-model="editing.notes" class="rs-input" placeholder="Staff notes about this member..." rows="3" style="margin-bottom: 16px; resize: vertical; font-family: inherit; font-size: 13px;"></textarea>
 
         <!-- Subscription status quick actions -->
         <div v-if="editing.membershipDuration" style="border-top:1px solid #1c2026; padding-top:14px; margin-bottom:16px;">

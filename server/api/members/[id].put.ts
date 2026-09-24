@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, "id");
   const body = await readBody(event);
 
-  const allowed = ["firstName", "lastName", "email", "phone", "address", "dob", "points"];
+  const allowed = ["firstName", "lastName", "email", "phone", "address", "dob", "points", "notes"];
   const patch: Record<string, any> = {};
   for (const key of allowed) {
     if (body[key] !== undefined) patch[key] = body[key];

@@ -33,7 +33,8 @@ const MemberSchema = new Schema(
     weeklyPassExpiry:       { type: Date, default: null },
     archived:               { type: Boolean, default: false },
     archivedAt:             { type: Date, default: null },
-    archivedReason:         { type: String, default: null }, // set when a weekly pass is purchased; nil = no active pass // cumulative days paused, used to extend expiry on resume
+    archivedReason:         { type: String, default: null },
+    notes:                  { type: String, default: "" }, // staff notes about this member // set when a weekly pass is purchased; nil = no active pass // cumulative days paused, used to extend expiry on resume
   },
   { timestamps: true }
 );

@@ -44,6 +44,7 @@ export default defineEventHandler(async (event) => {
       archived: m.archived || false,
       archivedAt: m.archivedAt || null,
       archivedReason: m.archivedReason || null,
+      notes: m.notes || "",
     }));
   }
 
