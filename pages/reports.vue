@@ -200,6 +200,39 @@ const grandTotal = computed(() => {
          (data.value.inventorySales?.totalRevenue || 0) +
          (data.value.membershipSales?.totalRevenue || 0);
 });
+
+// Receipt void request system
+const { user: currentUser } = useAuth();
+const voidFor = ref(null);
+const voidReason = ref("");
+const voidError = ref("");
+const reviewFor = ref(null);
+const rejectionReason = ref("");
+const { data: receiptVoidRequests, refresh: refreshVoids } = await useFetch("/api/receipt-void-requests");
+
+async function submitReceiptVoid() {
+  voidError.value = "";
+  try {
+    await $fetch(`/api/receipts/${voidFor.value.id}/void-request`, { method: "POST", body: { reason: voidReason.value } });
+    voidFor.value = null;
+    voidReason.value = "";
+    await refreshVoids();
+  } catch (e) { voidError.value = e.data?.statusMessage || "Could not submit void request."; }
+}
+
+async function reviewReceiptVoid(action) {
+  await $fetch(`/api/receipts/${reviewFor.value.id}/void-review`, {
+    method: "POST",
+    body: { action, rejectionReason: rejectionReason.value },
+  });
+  reviewFor.value = null;
+  rejectionReason.value = "";
+  await refreshVoids();
+}
+
+function kindLabel(kind) {
+  return kind === "visit" ? "Check-in fee" : kind === "membership" ? "Membership sale" : "Inventory / service";
+}
 </script>
 
 <template>
@@ -310,15 +343,21 @@ const grandTotal = computed(() => {
         </div>
       </div>
       <div class="rs-card" style="padding: 0;">
-        <div style="display: grid; grid-template-columns: 1fr 1.5fr 90px 80px; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
-          <span>Member / Guest</span><span>Fee type</span><span>Amount</span><span>Date & time</span>
+        <div style="display: grid; grid-template-columns: 1fr 1.5fr 90px 80px 60px; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
+          <span>Member / Guest</span><span>Fee type</span><span>Amount</span><span>Date & time</span><span></span>
         </div>
         <div v-if="!data.checkinSales.transactions?.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No check-in fees in this period.</div>
-        <div v-for="(t, i) in data.checkinSales.transactions" :key="i" style="display: grid; grid-template-columns: 1fr 1.5fr 90px 80px; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+        <div v-for="(t, i) in data.checkinSales.transactions" :key="i"
+          style="display: grid; grid-template-columns: 1fr 1.5fr 90px 80px 60px; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;"
+          :style="{ opacity: t.voidStatus === 'approved' ? 0.4 : 1 }">
           <span style="font-weight: 600; font-size: 13px;">{{ t.name }}</span>
           <span style="font-size: 12px; color: #aab0bb;">{{ t.feeType }}</span>
           <span style="font-size: 12.5px; color: #5bb8f5;">₱{{ t.amount.toLocaleString() }}</span>
           <span style="font-size: 11.5px; color: #7a8190;">{{ new Date(t.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</span>
+          <div>
+            <span v-if="t.voidStatus === 'pending'" style="font-size:10px; color:#f3c44b; border:1px solid #5a4a14; border-radius:4px; padding:2px 5px;">pending</span>
+            <button v-else-if="t.voidStatus !== 'approved' && t.id" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px; color:#e88;" @click="voidFor=t; voidReason=''; voidError=''">Void</button>
+          </div>
         </div>
       </div>
     </template>
@@ -332,17 +371,23 @@ const grandTotal = computed(() => {
         <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total revenue</div><div style="font-size: 24px; font-weight: 800;">₱{{ data.inventorySales.totalRevenue.toLocaleString() }}</div></div>
       </div>
       <div class="rs-card" style="padding: 0;">
-        <div style="display: grid; grid-template-columns: 1fr 2fr 80px 100px; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
-          <span>Client</span><span>Items</span><span>Amount</span><span>Date & time</span>
+        <div style="display: grid; grid-template-columns: 1fr 2fr 80px 100px 60px; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
+          <span>Client</span><span>Items</span><span>Amount</span><span>Date & time</span><span></span>
         </div>
         <div v-if="!data.inventorySales.transactions?.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No sales in this period.</div>
-        <div v-for="(t, i) in data.inventorySales.transactions" :key="i" style="display: grid; grid-template-columns: 1fr 2fr 80px 100px; gap: 8px; align-items: start; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+        <div v-for="(t, i) in data.inventorySales.transactions" :key="i"
+          style="display: grid; grid-template-columns: 1fr 2fr 80px 100px 60px; gap: 8px; align-items: start; padding: 10px 18px; border-bottom: 1px solid #1c2026;"
+          :style="{ opacity: t.voidStatus === 'approved' ? 0.4 : 1 }">
           <span style="font-weight: 600; font-size: 13px;">{{ t.name }}</span>
           <div>
             <div v-for="item in t.items" :key="item.name" style="font-size: 12px; color: #aab0bb;">{{ item.name }} × {{ item.qty }}</div>
           </div>
           <span style="font-size: 12.5px; color: #5bb8f5;">₱{{ t.total.toLocaleString() }}</span>
           <span style="font-size: 11.5px; color: #7a8190;">{{ new Date(t.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</span>
+          <div>
+            <span v-if="t.voidStatus === 'pending'" style="font-size:10px; color:#f3c44b; border:1px solid #5a4a14; border-radius:4px; padding:2px 5px;">pending</span>
+            <button v-else-if="t.voidStatus !== 'approved' && t.id" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px; color:#e88;" @click="voidFor=t; voidReason=''; voidError=''">Void</button>
+          </div>
         </div>
       </div>
     </template>
@@ -355,15 +400,21 @@ const grandTotal = computed(() => {
         <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total revenue</div><div style="font-size: 24px; font-weight: 800;">₱{{ data.membershipSales.totalRevenue.toLocaleString() }}</div></div>
       </div>
       <div class="rs-card" style="padding: 0;">
-        <div style="display: grid; grid-template-columns: 1fr 2fr 80px 100px; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
-          <span>Member</span><span>Plan</span><span>Amount</span><span>Date & time</span>
+        <div style="display: grid; grid-template-columns: 1fr 2fr 80px 100px 60px; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
+          <span>Member</span><span>Plan</span><span>Amount</span><span>Date & time</span><span></span>
         </div>
         <div v-if="!data.membershipSales.transactions?.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No membership sales in this period.</div>
-        <div v-for="(t, i) in data.membershipSales.transactions" :key="i" style="display: grid; grid-template-columns: 1fr 2fr 80px 100px; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+        <div v-for="(t, i) in data.membershipSales.transactions" :key="i"
+          style="display: grid; grid-template-columns: 1fr 2fr 80px 100px 60px; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;"
+          :style="{ opacity: t.voidStatus === 'approved' ? 0.4 : 1 }">
           <span style="font-weight: 600; font-size: 13px;">{{ t.name }}</span>
           <span style="font-size: 12px; color: #aab0bb;">{{ t.plan }}</span>
           <span style="font-size: 12.5px; color: #5bb8f5;">₱{{ t.amount.toLocaleString() }}</span>
           <span style="font-size: 11.5px; color: #7a8190;">{{ new Date(t.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</span>
+          <div>
+            <span v-if="t.voidStatus === 'pending'" style="font-size:10px; color:#f3c44b; border:1px solid #5a4a14; border-radius:4px; padding:2px 5px;">pending</span>
+            <button v-else-if="t.voidStatus !== 'approved' && t.id" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px; color:#e88;" @click="voidFor=t; voidReason=''; voidError=''">Void</button>
+          </div>
         </div>
       </div>
     </template>
@@ -431,6 +482,73 @@ const grandTotal = computed(() => {
         </div><!-- end rs-analytics-table -->
       </template>
     </template>
+    <!-- Pending receipt void requests - super admin only -->
+    <div v-if="currentUser?.role === 'superadmin' && receiptVoidRequests?.length" class="rs-card" style="padding:0; margin-top:22px;">
+      <div style="padding:12px 18px; font-weight:700; font-size:13.5px; border-bottom:1px solid #1c2026; color:#f3c44b;">
+        Pending sales void requests ({{ receiptVoidRequests.length }})
+      </div>
+      <div v-for="r in receiptVoidRequests" :key="r.id" style="display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid #1c2026;">
+        <div style="flex:1;">
+          <div style="font-size:13px; font-weight:600;">{{ r.name }}</div>
+          <div style="font-size:11.5px; color:#aab0bb; margin-top:2px;">
+            {{ kindLabel(r.kind) }} · ₱{{ r.total }} · Reason: {{ r.voidReason }} · Requested by {{ r.voidRequestedBy }}
+          </div>
+        </div>
+        <button class="rs-btn-secondary" style="padding:5px 10px; font-size:12px; color:#8ee0ab; border-color:#245a34;" @click="reviewFor=r; rejectionReason=''">Review</button>
+      </div>
+    </div>
+
+    <!-- Void request modal -->
+    <div v-if="voidFor" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:60;">
+      <div style="width:420px;background:#13161b;border:1px solid #232730;border-radius:14px;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-weight:800;font-size:16px;">Request void</div>
+          <button @click="voidFor=null" style="background:transparent;border:none;color:#8a909b;cursor:pointer;">✕</button>
+        </div>
+        <div style="background:#1c2128;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;">
+          <div style="font-weight:600;margin-bottom:4px;">{{ voidFor.name }}</div>
+          <div style="color:#aab0bb;font-size:12px;">
+            {{ kindLabel(voidFor.kind) }} · ₱{{ (voidFor.amount || voidFor.total)?.toLocaleString() }}
+          </div>
+        </div>
+        <p style="font-size:12.5px;color:#aab0bb;margin:0 0 14px;">This requires super admin approval before the sale is removed from reports.</p>
+        <label style="font-size:12px;color:#9aa1ab;display:block;margin-bottom:6px;">Reason for void</label>
+        <input v-model="voidReason" class="rs-input" placeholder="e.g. Wrong client, duplicate entry..." style="margin-bottom:10px;" />
+        <div v-if="voidError" style="color:#e36b6b;font-size:12.5px;margin-bottom:10px;">{{ voidError }}</div>
+        <div style="display:flex;gap:8px;">
+          <button class="rs-btn-secondary" style="flex:1;justify-content:center;" @click="voidFor=null">Cancel</button>
+          <button class="rs-btn-secondary" style="flex:1;justify-content:center;color:#e88;border-color:#5a2424;" :disabled="!voidReason" @click="submitReceiptVoid">Submit request</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Review void modal (super admin) -->
+    <div v-if="reviewFor" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:60;">
+      <div style="width:420px;background:#13161b;border:1px solid #232730;border-radius:14px;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-weight:800;font-size:16px;">Review void request</div>
+          <button @click="reviewFor=null" style="background:transparent;border:none;color:#8a909b;cursor:pointer;">✕</button>
+        </div>
+        <div style="background:#1c2128;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;">
+          <div style="font-weight:600;margin-bottom:4px;">{{ reviewFor.name }}</div>
+          <div style="color:#aab0bb;font-size:12px;">{{ kindLabel(reviewFor.kind) }} · ₱{{ reviewFor.total }}</div>
+          <div style="color:#f3c44b;margin-top:8px;font-size:12px;">Void reason: "{{ reviewFor.voidReason }}"</div>
+          <div style="color:#7a8190;margin-top:2px;font-size:11.5px;">Requested by {{ reviewFor.voidRequestedBy }}</div>
+        </div>
+        <p style="font-size:12.5px;color:#aab0bb;margin:0 0 14px;">
+          <b>Approve</b> to permanently remove this sale from all reports.<br>
+          <b>Reject</b> to keep it.
+        </p>
+        <label style="font-size:12px;color:#9aa1ab;display:block;margin-bottom:6px;">Rejection reason <span style="color:#5d6470;">(if rejecting)</span></label>
+        <input v-model="rejectionReason" class="rs-input" placeholder="Optional" style="margin-bottom:14px;" />
+        <div style="display:flex;gap:8px;">
+          <button class="rs-btn-secondary" style="flex:1;justify-content:center;" @click="reviewFor=null">Cancel</button>
+          <button class="rs-btn-secondary" style="flex:1;justify-content:center;color:#e88;border-color:#5a2424;" @click="reviewReceiptVoid('reject')">Reject</button>
+          <button class="rs-btn-primary" style="flex:1;justify-content:center;" @click="reviewReceiptVoid('approve')">Approve void</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 

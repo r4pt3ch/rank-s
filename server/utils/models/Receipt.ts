@@ -17,7 +17,14 @@ const ReceiptSchema = new Schema(
     issuedBy: { type: Schema.Types.ObjectId, ref: "User" },
     // 'pos' = POS product sale, 'visit' = automatic check-in visit fee, 'membership' = plan purchase/renewal
     kind: { type: String, enum: ["pos", "visit", "membership"], default: "pos" },
-    voided: { type: Boolean, default: false },
+    voided:              { type: Boolean, default: false },
+    voidStatus:          { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },
+    voidReason:          { type: String, default: null },
+    voidRequestedBy:     { type: Schema.Types.ObjectId, ref: "User", default: null },
+    voidRequestedAt:     { type: Date, default: null },
+    voidReviewedBy:      { type: Schema.Types.ObjectId, ref: "User", default: null },
+    voidReviewedAt:      { type: Date, default: null },
+    voidRejectionReason: { type: String, default: null },
   },
   { timestamps: true }
 );

@@ -120,10 +120,12 @@ export default defineEventHandler(async (event) => {
       .slice()
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .map((r) => ({
+        id: String(r._id),
         name: r.name,
         feeType: r.items?.[0]?.name || "Visit fee",
         amount: r.total,
         datetime: r.createdAt,
+        voidStatus: (r as any).voidStatus || "none",
       })),
     byDay: Object.entries(checkinByDay)
       .sort((a, b) => a[0].localeCompare(b[0]))
@@ -148,10 +150,12 @@ export default defineEventHandler(async (event) => {
       .slice()
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .map((r) => ({
+        id: String(r._id),
         name: r.name,
         items: r.items || [],
         total: r.total,
         datetime: r.createdAt,
+        voidStatus: (r as any).voidStatus || "none",
       })),
   };
 
@@ -167,10 +171,12 @@ export default defineEventHandler(async (event) => {
       .slice()
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .map((r) => ({
+        id: String(r._id),
         name: r.name,
         plan: r.items?.[0]?.name || "Membership",
         amount: r.total,
         datetime: r.createdAt,
+        voidStatus: (r as any).voidStatus || "none",
       })),
   };
 

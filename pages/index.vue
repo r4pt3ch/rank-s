@@ -8,6 +8,8 @@ const { data: members } = await useFetch("/api/members");
 const { data: checkins, refresh: refreshCheckins } = await useFetch("/api/checkins", { query: { today: "1" } });
 const { data: notifications, refresh: refreshNotifications } = await useFetch("/api/notifications");
 const { data: voidRequests } = await useFetch("/api/void-requests");
+const { data: receiptVoidRequests } = await useFetch("/api/receipt-void-requests");
+const totalVoidsPending = computed(() => (voidRequests.value?.length || 0) + (receiptVoidRequests.value?.length || 0));
 
 const reportable = computed(() => (checkins.value || []).filter((c) => !c.duplicateVisit && !c.voided));
 const walkins = computed(() => reportable.value.filter((c) => c.type === "walkin").length);
@@ -36,12 +38,15 @@ async function resetDashboard() {
     </div>
 
     <div
-      v-if="user?.role === 'superadmin' && voidRequests?.length"
+      v-if="user?.role === 'superadmin' && totalVoidsPending > 0"
       style="background: #2a1a2a; border: 1px solid #7a2474; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; font-size: 13px; color: #e8a8e8; display: flex; align-items: flex-start; gap: 10px;"
     >
       <div style="flex: 1;">
-        {{ voidRequests.length }} void request{{ voidRequests.length > 1 ? "s" : "" }} pending your approval.
-        <NuxtLink to="/checkin" style="color: #e8a8e8; text-decoration: underline;">Review in Check-in →</NuxtLink>
+        {{ totalVoidsPending }} void request{{ totalVoidsPending > 1 ? "s" : "" }} pending your approval
+        <span v-if="voidRequests?.length"> ({{ voidRequests.length }} check-in<span v-if="voidRequests.length > 1">s</span>)</span>
+        <span v-if="receiptVoidRequests?.length"> ({{ receiptVoidRequests.length }} sale<span v-if="receiptVoidRequests.length > 1">s</span>)</span>.
+        <NuxtLink to="/checkin" v-if="voidRequests?.length" style="color: #e8a8e8; text-decoration: underline; margin-left:4px;">Check-in →</NuxtLink>
+        <NuxtLink to="/reports" v-if="receiptVoidRequests?.length" style="color: #e8a8e8; text-decoration: underline; margin-left:4px;">Reports →</NuxtLink>
       </div>
     </div>
 
