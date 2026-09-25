@@ -219,7 +219,15 @@ const grandTotal = computed(() => {
          (data.value.membershipSales?.totalRevenue || 0);
 });
 
-// Receipt void request system
+// Check-in list pagination
+const CHECKIN_LIST_PER_PAGE = 25;
+const checkinListPage = ref(1);
+watch(() => data.value?.checkinList, () => { checkinListPage.value = 1; });
+const totalCheckinListPages = computed(() => Math.max(1, Math.ceil((data.value?.checkinList?.length || 0) / CHECKIN_LIST_PER_PAGE)));
+const pagedCheckinList = computed(() => {
+  const start = (checkinListPage.value - 1) * CHECKIN_LIST_PER_PAGE;
+  return (data.value?.checkinList || []).slice(start, start + CHECKIN_LIST_PER_PAGE);
+});
 const { user: currentUser } = useAuth();
 const voidFor = ref(null);
 const voidReason = ref("");
@@ -353,13 +361,14 @@ function kindLabel(kind) {
         <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Walk-ins</div><div style="font-size: 24px; font-weight: 800;">{{ (data.checkinList || []).filter(c => c.type === 'walkin').length }}</div></div>
       </div>
       <div class="rs-card" style="padding: 0;">
-        <div style="display: grid; grid-template-columns: 1.4fr 80px 80px 90px 90px 50px; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
-          <span>Name</span><span>Type</span><span>Tier</span><span>Fee</span><span>Date & time</span><span></span>
+        <div style="display: grid; grid-template-columns: 40px 1.4fr 80px 80px 90px 90px 50px; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
+          <span>#</span><span>Name</span><span>Type</span><span>Tier</span><span>Fee</span><span>Date & time</span><span></span>
         </div>
         <div v-if="!data.checkinList?.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No check-ins in this period.</div>
-        <div v-for="c in data.checkinList" :key="c.id"
-          style="display: grid; grid-template-columns: 1.4fr 80px 80px 90px 90px 50px; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;"
+        <div v-for="(c, idx) in pagedCheckinList" :key="c.id"
+          style="display: grid; grid-template-columns: 40px 1.4fr 80px 80px 90px 90px 50px; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;"
           :style="{ opacity: c.voided ? 0.4 : 1 }">
+          <span style="font-size: 11.5px; color: #5d6470; text-align: right;">{{ ((checkinListPage - 1) * CHECKIN_LIST_PER_PAGE) + idx + 1 }}</span>
           <span style="font-weight: 600; font-size: 13px;">
             {{ c.name }}
             <span v-if="c.duplicateVisit" style="font-size:9px; color:#7a8190; font-weight:400;"> repeat</span>
@@ -378,6 +387,14 @@ function kindLabel(kind) {
           <span style="font-size: 11.5px; color: #7a8190;">{{ new Date(c.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</span>
           <span v-if="c.voided" style="font-size:10px; color:#e88; border:1px solid #5a2424; border-radius:4px; padding:2px 4px;">voided</span>
         </div>
+        <Pagination
+          :page="checkinListPage"
+          :totalPages="totalCheckinListPages"
+          :total="data.checkinList?.length || 0"
+          :perPage="CHECKIN_LIST_PER_PAGE"
+          @prev="checkinListPage--"
+          @next="checkinListPage++"
+        />
       </div>
     </template>
 
