@@ -50,8 +50,9 @@ function getRange(period: string, utcOffset: number, customStart?: string, custo
   return { start: todayStart, end: now };
 }
 
-function dayKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+function dayKey(date: Date, utcOffset: number): string {
+  const local = new Date(date.getTime() + utcOffset * 60 * 60 * 1000);
+  return local.toISOString().slice(0, 10);
 }
 
 export default defineEventHandler(async (event) => {
@@ -79,7 +80,7 @@ export default defineEventHandler(async (event) => {
 
   const goersByDay: Record<string, { member: number; walkin: number }> = {};
   for (const c of reportableCheckins) {
-    const key = dayKey(new Date(c.createdAt));
+    const key = dayKey(new Date(c.createdAt), utcOffset);
     if (!goersByDay[key]) goersByDay[key] = { member: 0, walkin: 0 };
     goersByDay[key][c.type === "member" ? "member" : "walkin"]++;
   }
@@ -102,7 +103,7 @@ export default defineEventHandler(async (event) => {
 
   for (const r of checkinReceipts) {
     checkinRevenue += r.total;
-    const key = dayKey(new Date(r.createdAt));
+    const key = dayKey(new Date(r.createdAt), utcOffset);
     if (!checkinByDay[key]) checkinByDay[key] = { revenue: 0, transactions: 0 };
     checkinByDay[key].revenue += r.total;
     checkinByDay[key].transactions += 1;
