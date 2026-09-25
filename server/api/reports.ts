@@ -181,12 +181,32 @@ export default defineEventHandler(async (event) => {
       })),
   };
 
+  // --- Check-in list (individual entries, sorted newest first) ---
+  const checkinList = checkins
+    .slice()
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .map((c) => ({
+      id: String(c._id),
+      name: c.name,
+      type: c.type,
+      rank: c.rank,
+      tier: (c as any).billedAs === "walkin" ? "walkin" : ((c as any).membershipTier || null),
+      fee: c.fee || 0,
+      servicesTotal: (c as any).servicesTotal || 0,
+      duplicateVisit: c.duplicateVisit || false,
+      expiredBilling: (c as any).expiredBilling || false,
+      voided: c.voided || false,
+      datetime: c.createdAt,
+    }));
+
   return {
     period,
     range: { start, end },
     gymGoers,
+    checkinList,
     checkinSales,
     inventorySales,
     membershipSales,
+    registeredMembers: undefined,
   };
 });

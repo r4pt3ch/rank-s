@@ -26,6 +26,7 @@ function years() { const y = new Date().getFullYear(); return Array.from({ lengt
 
 const views = [
   { id: "goers",      label: "Gym goers" },
+  { id: "checkinlist",label: "Check-in list" },
   { id: "checkin",    label: "Check-in sales" },
   { id: "inventory",  label: "Inventory & services" },
   { id: "membership", label: "Membership sales" },
@@ -186,8 +187,25 @@ function exportRegistered() {
   downloadCSV(`rank-s-member-analytics-${analyticsYear.value}.csv`, rows);
 }
 
+function exportCheckinList() {
+  if (!data.value) return;
+  const list = data.value.checkinList || [];
+  const rows = [
+    ["Rank S — Check-In List", period.value, rangeLabel.value],
+    [],
+    ["Name", "Type", "Tier", "Fee", "Services", "Date", "Time", "Notes"],
+    ...list.map((c) => {
+      const d = new Date(c.datetime);
+      const notes = [c.duplicateVisit ? "repeat" : "", c.expiredBilling ? "expired billing" : "", c.voided ? "voided" : ""].filter(Boolean).join(", ");
+      return [c.name, c.type, c.tier || "—", c.fee, c.servicesTotal, d.toLocaleDateString("en-PH"), d.toLocaleTimeString("en-PH"), notes];
+    }),
+  ];
+  downloadCSV(`rank-s-checkin-list-${periodSlug()}.csv`, rows);
+}
+
 function exportCurrent() {
   if (view.value === "goers") exportGoers();
+  else if (view.value === "checkinlist") exportCheckinList();
   else if (view.value === "checkin") exportCheckin();
   else if (view.value === "inventory") exportInventory();
   else if (view.value === "registered") exportRegistered();
@@ -322,6 +340,43 @@ function kindLabel(kind) {
           </div>
           <span style="font-size: 12px; color: #5bb8f5; min-width: 80px; text-align: right;">{{ d.member }} members</span>
           <span style="font-size: 12px; color: #aab0bb; min-width: 60px; text-align: right;">{{ d.walkin }} walk-in</span>
+        </div>
+      </div>
+    </template>
+
+    <!-- Check-in list view -->
+    <template v-else-if="data && !pending && view === 'checkinlist'">
+      <p style="font-size: 12.5px; color: #5d6470; margin: -8px 0 16px;">Every client who visited in the selected period — members and walk-ins — sorted newest first.</p>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px;">
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total check-ins</div><div style="font-size: 24px; font-weight: 800;">{{ data.checkinList?.length || 0 }}</div></div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Members</div><div style="font-size: 24px; font-weight: 800;">{{ (data.checkinList || []).filter(c => c.type === 'member').length }}</div></div>
+        <div class="rs-card" style="padding: 16px;"><div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Walk-ins</div><div style="font-size: 24px; font-weight: 800;">{{ (data.checkinList || []).filter(c => c.type === 'walkin').length }}</div></div>
+      </div>
+      <div class="rs-card" style="padding: 0;">
+        <div style="display: grid; grid-template-columns: 1.4fr 80px 80px 90px 90px 50px; gap: 8px; padding: 12px 18px; font-size: 11.5px; color: #7a8190; border-bottom: 1px solid #1c2026;">
+          <span>Name</span><span>Type</span><span>Tier</span><span>Fee</span><span>Date & time</span><span></span>
+        </div>
+        <div v-if="!data.checkinList?.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No check-ins in this period.</div>
+        <div v-for="c in data.checkinList" :key="c.id"
+          style="display: grid; grid-template-columns: 1.4fr 80px 80px 90px 90px 50px; gap: 8px; align-items: center; padding: 10px 18px; border-bottom: 1px solid #1c2026;"
+          :style="{ opacity: c.voided ? 0.4 : 1 }">
+          <span style="font-weight: 600; font-size: 13px;">
+            {{ c.name }}
+            <span v-if="c.duplicateVisit" style="font-size:9px; color:#7a8190; font-weight:400;"> repeat</span>
+            <span v-if="c.expiredBilling" style="font-size:9px; color:#e88; font-weight:400;"> expired</span>
+          </span>
+          <span style="font-size: 12px; color: #aab0bb; text-transform: capitalize;">{{ c.type }}</span>
+          <span style="font-size: 12px;">
+            <span v-if="c.tier === 'elite'" style="color:#f3c44b;">Rank S</span>
+            <span v-else-if="c.tier === 'regular'" style="color:#5bb8f5;">Rank E–A</span>
+            <span v-else style="color:#7a8190;">Walk-in</span>
+          </span>
+          <span style="font-size: 12.5px; color: #5bb8f5;">
+            ₱{{ (c.fee + c.servicesTotal).toLocaleString() }}
+            <span v-if="c.servicesTotal" style="font-size:10px; color:#7a8190;">(+{{ c.servicesTotal }})</span>
+          </span>
+          <span style="font-size: 11.5px; color: #7a8190;">{{ new Date(c.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</span>
+          <span v-if="c.voided" style="font-size:10px; color:#e88; border:1px solid #5a2424; border-radius:4px; padding:2px 4px;">voided</span>
         </div>
       </div>
     </template>
