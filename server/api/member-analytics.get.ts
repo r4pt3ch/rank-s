@@ -119,6 +119,7 @@ export default defineEventHandler(async (event) => {
       membershipStatus: m.membershipPaused ? "paused" : (!m.membershipDuration ? "none" : (m.membershipExpiry && new Date(m.membershipExpiry) < now ? "expired" : "active")),
       currentTier: m.membershipTier || m.membershipCategory || null,
       currentDuration: m.membershipDuration || null,
+      currentStudentType: m.membershipStudentType || null,
       totalPurchases,
       longestStreak,  // longest consecutive renewal streak
       currentStreak,  // current active streak (0 if lapsed)

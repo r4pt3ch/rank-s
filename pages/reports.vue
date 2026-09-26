@@ -11,14 +11,45 @@ const { data, pending, error: fetchError } = await useFetch("/api/reports", {
 const analyticsYear  = ref(new Date().getFullYear());
 const analyticsMonth = ref("");
 const analyticsSearch = ref("");
+const analyticsTierFilter = ref("all"); // 'all' | 'walkin' | 'regular' | 'elite' | 'none'
+const analyticsSort = ref("joinDate-desc"); // joinDate-desc | joinDate-asc | name | purchases | streak
 const expandedMember = ref(null);
 const { data: analytics, pending: analyticsPending } = await useFetch("/api/member-analytics", {
   query: { year: analyticsYear, month: analyticsMonth },
   watch: [analyticsYear, analyticsMonth],
 });
+
+const TIER_LABELS_MAP = { walkin: "Walk-In (Rank F)", regular: "Regular (Rank E–A)", elite: "Elite (Rank S)", none: "No membership" };
+const DURATION_LABELS_MAP = { weekly: "Weekly", monthly: "Monthly", quarterly: "3 Months", sixmonth: "6 Months", annual: "Annual" };
+
+function membershipLabel(m) {
+  if (!m.currentTier || !m.currentDuration) return "No membership";
+  const tier = TIER_LABELS_MAP[m.currentTier] || m.currentTier;
+  const dur = DURATION_LABELS_MAP[m.currentDuration] || m.currentDuration;
+  const st = m.currentStudentType ? (m.currentStudentType === "student" ? " · Student" : " · Non-student") : "";
+  return `${tier} · ${dur}${st}`;
+}
+
 const filteredAnalytics = computed(() => {
+  let list = analytics.value?.members || [];
   const q = analyticsSearch.value.toLowerCase();
-  return (analytics.value?.members || []).filter((m) => !q || m.name.toLowerCase().includes(q));
+  if (q) list = list.filter((m) => m.name.toLowerCase().includes(q));
+  if (analyticsTierFilter.value !== "all") {
+    if (analyticsTierFilter.value === "none") {
+      list = list.filter((m) => !m.currentTier);
+    } else {
+      list = list.filter((m) => m.currentTier === analyticsTierFilter.value);
+    }
+  }
+  const s = analyticsSort.value;
+  return [...list].sort((a, b) => {
+    if (s === "joinDate-desc") return new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime();
+    if (s === "joinDate-asc")  return new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime();
+    if (s === "name")          return a.name.localeCompare(b.name);
+    if (s === "purchases")     return b.totalPurchases - a.totalPurchases;
+    if (s === "streak")        return b.longestStreak - a.longestStreak;
+    return 0;
+  });
 });
 const MONTHS = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function statusColor(s) { return s === "active" ? "#8ee0ab" : s === "expired" ? "#e88" : s === "paused" ? "#f3c44b" : "#7a8190"; }
@@ -492,16 +523,30 @@ function kindLabel(kind) {
     </template>
     <!-- Registered members / member analytics view -->
     <template v-else-if="view === 'registered'">
-      <!-- Own filter bar — independent from the revenue period selector -->
-      <div style="display:flex; gap:10px; align-items:center; margin-bottom:18px; flex-wrap:wrap;">
-        <select v-model.number="analyticsYear" class="rs-input" style="width:100px;">
+      <!-- Filter bar -->
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
+        <select v-model.number="analyticsYear" class="rs-input" style="width:95px;">
           <option v-for="y in years()" :key="y" :value="y">{{ y }}</option>
         </select>
-        <select v-model="analyticsMonth" class="rs-input" style="width:100px;">
+        <select v-model="analyticsMonth" class="rs-input" style="width:105px;">
           <option value="">All months</option>
           <option v-for="(m, i) in MONTHS.slice(1)" :key="i+1" :value="i+1">{{ m }}</option>
         </select>
-        <input v-model="analyticsSearch" class="rs-input" style="width:200px;" placeholder="Search by name..." />
+        <input v-model="analyticsSearch" class="rs-input" style="width:170px;" placeholder="Search by name..." />
+        <select v-model="analyticsTierFilter" class="rs-input" style="width:150px;">
+          <option value="all">All tiers</option>
+          <option value="elite">Elite (Rank S)</option>
+          <option value="regular">Regular (Rank E–A)</option>
+          <option value="walkin">Walk-In (Rank F)</option>
+          <option value="none">No membership</option>
+        </select>
+        <select v-model="analyticsSort" class="rs-input" style="width:150px;">
+          <option value="joinDate-desc">Newest first</option>
+          <option value="joinDate-asc">Oldest first</option>
+          <option value="name">Name A–Z</option>
+          <option value="purchases">Most purchases</option>
+          <option value="streak">Longest streak</option>
+        </select>
         <span style="font-size:12px; color:#5d6470;">{{ filteredAnalytics.length }} member{{ filteredAnalytics.length === 1 ? '' : 's' }}</span>
       </div>
 
@@ -509,49 +554,46 @@ function kindLabel(kind) {
       <template v-else>
         <div class="rs-card" style="padding:0;">
         <div class="rs-analytics-table">
-        <div style="min-width:600px;">
+        <div style="min-width:720px;">
           <!-- Header -->
-          <div style="display:grid; grid-template-columns:1.5fr 90px 80px 60px 60px 60px 70px; gap:8px; padding:10px 18px; font-size:11px; color:#5d6470; border-bottom:1px solid #1c2026;">
-            <span>Member</span>
-            <span>Joined</span>
-            <span>Days reg.</span>
-            <span>Plans</span>
-            <span>Streak</span>
-            <span>Current</span>
-            <span>Status</span>
+          <div style="display:grid; grid-template-columns:40px 1.4fr 1.8fr 80px 75px 55px 55px 65px; gap:8px; padding:10px 18px; font-size:11px; color:#5d6470; border-bottom:1px solid #1c2026;">
+            <span>#</span><span>Member</span><span>Membership</span><span>Joined</span><span>Days reg.</span><span>Plans</span><span>Streak</span><span>Status</span>
           </div>
           <div v-if="!filteredAnalytics.length" style="padding:24px; text-align:center; color:#5d6470; font-size:13px;">No members found.</div>
-          <template v-for="m in filteredAnalytics" :key="m.id">
-            <div style="display:grid; grid-template-columns:1.5fr 90px 80px 60px 60px 60px 70px; gap:8px; align-items:center; padding:10px 18px; border-bottom:1px solid #1c2026; cursor:pointer;"
+          <template v-for="(m, idx) in filteredAnalytics" :key="m.id">
+            <div style="display:grid; grid-template-columns:40px 1.4fr 1.8fr 80px 75px 55px 55px 65px; gap:8px; align-items:center; padding:10px 18px; border-bottom:1px solid #1c2026; cursor:pointer;"
               :style="{ background: expandedMember === m.id ? '#0d0f12' : '' }"
               @click="expandedMember = expandedMember === m.id ? null : m.id">
+              <span style="font-size:11.5px; color:#5d6470; text-align:right;">{{ idx + 1 }}</span>
               <span style="font-size:13px; font-weight:600;">{{ m.name }}</span>
+              <span style="font-size:11.5px; color:#aab0bb;">{{ membershipLabel(m) }}</span>
               <span style="font-size:12px; color:#aab0bb;">{{ m.joinDate }}</span>
               <span style="font-size:12px;">{{ m.daysRegistered }}d</span>
               <span style="font-size:12px; text-align:center;">{{ m.totalPurchases }}</span>
               <span style="font-size:12px; text-align:center;" :style="{ color: m.longestStreak >= 3 ? '#8ee0ab' : '' }">{{ m.longestStreak }}x</span>
-              <span style="font-size:12px; text-align:center;" :style="{ color: m.currentStreak > 0 ? '#5bb8f5' : '#5d6470' }">{{ m.currentStreak }}x</span>
               <span style="font-size:11px; font-weight:600;" :style="{ color: statusColor(m.membershipStatus) }">{{ m.membershipStatus }}</span>
             </div>
             <!-- Expanded: full purchase history -->
             <div v-if="expandedMember === m.id" style="padding:12px 18px 16px; background:#0d0f12; border-bottom:1px solid #1c2026;">
               <div style="font-size:12px; color:#5d6470; margin-bottom:8px;">
-                Registered {{ m.daysRegistered }} days ago · {{ m.totalPurchases }} subscription purchase{{ m.totalPurchases === 1 ? '' : 's' }} · Longest streak: {{ m.longestStreak }}x · Current streak: {{ m.currentStreak }}x
+                Registered {{ m.daysRegistered }} days ago · {{ m.totalPurchases }} plan{{ m.totalPurchases === 1 ? '' : 's' }} purchased · Longest streak: {{ m.longestStreak }}x · Current streak: {{ m.currentStreak }}x
               </div>
               <div v-if="!m.purchases.length" style="font-size:12.5px; color:#5d6470;">No subscription purchases recorded.</div>
-              <div v-else style="display:grid; grid-template-columns:90px 1fr 80px; gap:6px; font-size:11px; color:#5d6470; margin-bottom:6px;">
-                <span>Date</span><span>Plan</span><span>Amount</span>
-              </div>
-              <div v-for="(p, i) in m.purchases" :key="i" style="display:grid; grid-template-columns:90px 1fr 80px; gap:6px; padding:5px 0; border-bottom:1px solid #1a1e24;">
-                <span style="font-size:12px; color:#aab0bb;">{{ p.date }}</span>
-                <span style="font-size:12px;">{{ p.plan }}</span>
-                <span style="font-size:12px; color:#5bb8f5;">₱{{ p.amount.toLocaleString() }}</span>
+              <div v-else>
+                <div style="display:grid; grid-template-columns:90px 1fr 80px; gap:6px; font-size:11px; color:#5d6470; margin-bottom:6px;">
+                  <span>Date</span><span>Plan</span><span>Amount</span>
+                </div>
+                <div v-for="(p, i) in m.purchases" :key="i" style="display:grid; grid-template-columns:90px 1fr 80px; gap:6px; padding:5px 0; border-bottom:1px solid #1a1e24;">
+                  <span style="font-size:12px; color:#aab0bb;">{{ p.date }}</span>
+                  <span style="font-size:12px;">{{ p.plan }}</span>
+                  <span style="font-size:12px; color:#5bb8f5;">₱{{ p.amount.toLocaleString() }}</span>
+                </div>
               </div>
             </div>
           </template>
         </div>
-        </div><!-- end min-width -->
         </div><!-- end rs-analytics-table -->
+        </div><!-- end rs-card -->
       </template>
     </template>
     <!-- Pending receipt void requests - super admin only -->
