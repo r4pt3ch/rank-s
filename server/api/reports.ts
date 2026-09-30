@@ -66,9 +66,11 @@ export default defineEventHandler(async (event) => {
   const period = ["daily", "weekly", "monthly", "alltime", "custom"].includes(String(query.period)) ? String(query.period) : "daily";
   const { start, end } = getRange(period, utcOffset, query.start as string | undefined, query.end as string | undefined);
 
-  const [checkins, receipts] = await Promise.all([
+  const [checkins, receipts, voidedCheckins, voidedReceipts] = await Promise.all([
     CheckIn.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
     Receipt.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
+    CheckIn.find({ createdAt: { $gte: start, $lte: end }, voided: true }).lean(),
+    Receipt.find({ createdAt: { $gte: start, $lte: end }, voided: true }).lean(),
   ]);
 
   // --- Gym goers report ---
@@ -199,6 +201,39 @@ export default defineEventHandler(async (event) => {
       datetime: c.createdAt,
     }));
 
+  // --- Voided records ---
+  const voidedTotal = voidedReceipts.reduce((s, r) => s + r.total, 0);
+  const voided = {
+    totalVoidedCheckins: voidedCheckins.length,
+    totalVoidedReceipts: voidedReceipts.length,
+    totalVoidedAmount: voidedTotal,
+    checkins: voidedCheckins
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map((c) => ({
+        id: String(c._id),
+        name: c.name,
+        type: c.type,
+        fee: c.fee || 0,
+        datetime: c.createdAt,
+        voidReason: (c as any).voidReason || null,
+        voidReviewedAt: (c as any).voidReviewedAt || null,
+      })),
+    receipts: voidedReceipts
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map((r) => ({
+        id: String(r._id),
+        name: r.name,
+        kind: r.kind,
+        items: r.items || [],
+        total: r.total,
+        datetime: r.createdAt,
+        voidReason: (r as any).voidReason || null,
+        voidReviewedAt: (r as any).voidReviewedAt || null,
+      })),
+  };
+
   return {
     period,
     range: { start, end },
@@ -207,6 +242,7 @@ export default defineEventHandler(async (event) => {
     checkinSales,
     inventorySales,
     membershipSales,
+    voided,
     registeredMembers: undefined,
   };
 });

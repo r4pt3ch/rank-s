@@ -62,6 +62,7 @@ const views = [
   { id: "inventory",  label: "Inventory & services" },
   { id: "membership", label: "Membership sales" },
   { id: "registered", label: "Registered members" },
+  { id: "voided",     label: "Voided" },
 ];
 const periods = [
   { id: "daily",   label: "Daily" },
@@ -234,12 +235,34 @@ function exportCheckinList() {
   downloadCSV(`rank-s-checkin-list-${periodSlug()}.csv`, rows);
 }
 
+function exportVoided() {
+  if (!data.value) return;
+  const v = data.value.voided;
+  const rows = [
+    ["Rank S — Voided Records", period.value, rangeLabel.value],
+    [],
+    ["Voided check-ins", v.totalVoidedCheckins],
+    ["Voided transactions", v.totalVoidedReceipts],
+    ["Total voided amount", v.totalVoidedAmount],
+    [],
+    ["--- Voided Check-ins ---"],
+    ["Name", "Type", "Fee", "Check-in date", "Void reason"],
+    ...v.checkins.map((c) => [c.name, c.type, c.fee, new Date(c.datetime).toLocaleString("en-PH"), c.voidReason || ""]),
+    [],
+    ["--- Voided Transactions ---"],
+    ["Client", "Type", "Amount", "Sale date", "Void reason"],
+    ...v.receipts.map((r) => [r.name, r.kind, r.total, new Date(r.datetime).toLocaleString("en-PH"), r.voidReason || ""]),
+  ];
+  downloadCSV(`rank-s-voided-${periodSlug()}.csv`, rows);
+}
+
 function exportCurrent() {
   if (view.value === "goers") exportGoers();
   else if (view.value === "checkinlist") exportCheckinList();
   else if (view.value === "checkin") exportCheckin();
   else if (view.value === "inventory") exportInventory();
   else if (view.value === "registered") exportRegistered();
+  else if (view.value === "voided") exportVoided();
   else exportMembership();
 }
 
@@ -521,6 +544,76 @@ function kindLabel(kind) {
         </div>
       </div>
     </template>
+    <!-- Voided view -->
+    <template v-else-if="data && !pending && view === 'voided'">
+      <p style="font-size: 12.5px; color: #5d6470; margin: -8px 0 16px;">All voided check-ins and receipts in the selected period — excluded from all other report views.</p>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px;">
+        <div class="rs-card" style="padding: 16px; border-color: #5a2424;">
+          <div style="font-size: 12px; color: #e88; margin-bottom: 10px;">Voided check-ins</div>
+          <div style="font-size: 24px; font-weight: 800;">{{ data.voided.totalVoidedCheckins }}</div>
+        </div>
+        <div class="rs-card" style="padding: 16px; border-color: #5a2424;">
+          <div style="font-size: 12px; color: #e88; margin-bottom: 10px;">Voided transactions</div>
+          <div style="font-size: 24px; font-weight: 800;">{{ data.voided.totalVoidedReceipts }}</div>
+        </div>
+        <div class="rs-card" style="padding: 16px; border-color: #5a2424;">
+          <div style="font-size: 12px; color: #e88; margin-bottom: 10px;">Voided revenue</div>
+          <div style="font-size: 24px; font-weight: 800;">₱{{ data.voided.totalVoidedAmount.toLocaleString() }}</div>
+        </div>
+      </div>
+
+      <!-- Voided check-ins -->
+      <div class="rs-card" style="padding:0; margin-bottom:18px;">
+        <div style="padding:12px 18px; font-weight:700; font-size:13.5px; border-bottom:1px solid #1c2026; color:#e88;">Voided check-ins</div>
+        <div v-if="!data.voided.checkins.length" style="padding:24px; text-align:center; color:#5d6470; font-size:13px;">No voided check-ins in this period.</div>
+        <div v-else>
+          <div style="display:grid; grid-template-columns:40px 1fr 80px 80px 1fr; gap:8px; padding:10px 18px; font-size:11px; color:#5d6470; border-bottom:1px solid #1c2026;">
+            <span>#</span><span>Name</span><span>Type</span><span>Fee</span><span>Voided on</span>
+          </div>
+          <div v-for="(c, i) in data.voided.checkins" :key="c.id" style="display:grid; grid-template-columns:40px 1fr 80px 80px 1fr; gap:8px; align-items:start; padding:10px 18px; border-bottom:1px solid #1c2026;">
+            <span style="font-size:11.5px; color:#5d6470; text-align:right;">{{ i + 1 }}</span>
+            <div>
+              <div style="font-size:13px; font-weight:600;">{{ c.name }}</div>
+              <div v-if="c.voidReason" style="font-size:11.5px; color:#7a8190;">Reason: {{ c.voidReason }}</div>
+            </div>
+            <span style="font-size:12px; color:#aab0bb; text-transform:capitalize;">{{ c.type }}</span>
+            <span style="font-size:12.5px; color:#e88; text-decoration:line-through;">₱{{ c.fee }}</span>
+            <div style="font-size:11.5px; color:#7a8190;">
+              <div>Checked in: {{ new Date(c.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</div>
+              <div v-if="c.voidReviewedAt" style="color:#5d6470;">Voided: {{ new Date(c.voidReviewedAt).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Voided transactions -->
+      <div class="rs-card" style="padding:0;">
+        <div style="padding:12px 18px; font-weight:700; font-size:13.5px; border-bottom:1px solid #1c2026; color:#e88;">Voided transactions</div>
+        <div v-if="!data.voided.receipts.length" style="padding:24px; text-align:center; color:#5d6470; font-size:13px;">No voided transactions in this period.</div>
+        <div v-else>
+          <div style="display:grid; grid-template-columns:40px 1fr 90px 80px 80px 1fr; gap:8px; padding:10px 18px; font-size:11px; color:#5d6470; border-bottom:1px solid #1c2026;">
+            <span>#</span><span>Client</span><span>Type</span><span>Items</span><span>Amount</span><span>Voided on</span>
+          </div>
+          <div v-for="(r, i) in data.voided.receipts" :key="r.id" style="display:grid; grid-template-columns:40px 1fr 90px 80px 80px 1fr; gap:8px; align-items:start; padding:10px 18px; border-bottom:1px solid #1c2026;">
+            <span style="font-size:11.5px; color:#5d6470; text-align:right;">{{ i + 1 }}</span>
+            <div>
+              <div style="font-size:13px; font-weight:600;">{{ r.name }}</div>
+              <div v-if="r.voidReason" style="font-size:11.5px; color:#7a8190;">Reason: {{ r.voidReason }}</div>
+            </div>
+            <span style="font-size:12px; color:#aab0bb;">{{ kindLabel(r.kind) }}</span>
+            <div>
+              <div v-for="item in r.items" :key="item.name" style="font-size:11.5px; color:#aab0bb;">{{ item.name }}</div>
+            </div>
+            <span style="font-size:12.5px; color:#e88; text-decoration:line-through;">₱{{ r.total.toLocaleString() }}</span>
+            <div style="font-size:11.5px; color:#7a8190;">
+              <div>Sale: {{ new Date(r.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</div>
+              <div v-if="r.voidReviewedAt" style="color:#5d6470;">Voided: {{ new Date(r.voidReviewedAt).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
     <!-- Registered members / member analytics view -->
     <template v-else-if="view === 'registered'">
       <!-- Filter bar -->
