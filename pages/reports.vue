@@ -1,4 +1,5 @@
 <script setup>
+const { gymDateTime, gymDate, gymTime, offset } = useGymTime();
 const view = ref("goers"); // 'goers' | 'checkin' | 'inventory' | 'membership' | 'registered'
 const period = ref("daily");
 const customStart = ref("");
@@ -85,10 +86,14 @@ const rangeLabel = computed(() => {
   if (!data.value) return "";
   if (period.value === "alltime") return "All time";
   if (period.value === "custom") return `${customStart.value || "?"} – ${customEnd.value || "?"}`;
-  const start = new Date(data.value.range.start);
-  const end = new Date(data.value.range.end);
-  if (period.value === "daily") return start.toLocaleDateString();
-  return `${start.toLocaleDateString()} – ${end.toLocaleDateString()}`;
+  const tz = offset.value;
+  function localDate(d) {
+    return new Date(new Date(d).getTime() + tz * 3600000).toISOString().slice(0, 10);
+  }
+  const start = localDate(data.value.range.start);
+  const end = localDate(data.value.range.end);
+  if (period.value === "daily") return start;
+  return `${start} – ${end}`;
 });
 
 function periodSlug() {
@@ -138,7 +143,7 @@ function exportCheckin() {
     ["Member / Guest", "Fee Type", "Amount", "Date", "Time"],
     ...(c.transactions || []).map((t) => {
       const d = new Date(t.datetime);
-      return [t.name, t.feeType, t.amount, d.toLocaleDateString("en-PH"), d.toLocaleTimeString("en-PH")];
+      return [t.name, t.feeType, t.amount, gymDate(d), gymTime(d)];
     }),
   ];
   downloadCSV(`rank-s-checkin-sales-${periodSlug()}.csv`, rows);
@@ -157,7 +162,7 @@ function exportInventory() {
     ["Client", "Items", "Amount", "Date", "Time"],
     ...(inv.transactions || []).map((t) => {
       const d = new Date(t.datetime);
-      return [t.name, t.items.map((i) => `${i.name} x${i.qty}`).join("; "), t.total, d.toLocaleDateString("en-PH"), d.toLocaleTimeString("en-PH")];
+      return [t.name, t.items.map((i) => `${i.name} x${i.qty}`).join("; "), t.total, gymDate(d), gymTime(d)];
     }),
   ];
   downloadCSV(`rank-s-inventory-services-${periodSlug()}.csv`, rows);
@@ -175,7 +180,7 @@ function exportMembership() {
     ["Member", "Plan", "Amount", "Date", "Time"],
     ...(m.transactions || []).map((t) => {
       const d = new Date(t.datetime);
-      return [t.name, t.plan, t.amount, d.toLocaleDateString("en-PH"), d.toLocaleTimeString("en-PH")];
+      return [t.name, t.plan, t.amount, gymDate(d), gymTime(d)];
     }),
   ];
   downloadCSV(`rank-s-membership-sales-${periodSlug()}.csv`, rows);
@@ -229,7 +234,7 @@ function exportCheckinList() {
     ...list.map((c) => {
       const d = new Date(c.datetime);
       const notes = [c.duplicateVisit ? "repeat" : "", c.expiredBilling ? "expired billing" : "", c.voided ? "voided" : ""].filter(Boolean).join(", ");
-      return [c.name, c.type, c.tier || "—", c.fee, c.servicesTotal, d.toLocaleDateString("en-PH"), d.toLocaleTimeString("en-PH"), notes];
+      return [c.name, c.type, c.tier || "—", c.fee, c.servicesTotal, gymDate(d), gymTime(d), notes];
     }),
   ];
   downloadCSV(`rank-s-checkin-list-${periodSlug()}.csv`, rows);
@@ -247,11 +252,11 @@ function exportVoided() {
     [],
     ["--- Voided Check-ins ---"],
     ["Name", "Type", "Fee", "Check-in date", "Void reason"],
-    ...v.checkins.map((c) => [c.name, c.type, c.fee, new Date(c.datetime).toLocaleString("en-PH"), c.voidReason || ""]),
+    ...v.checkins.map((c) => [c.name, c.type, c.fee, gymDateTime(c.datetime), c.voidReason || ""]),
     [],
     ["--- Voided Transactions ---"],
     ["Client", "Type", "Amount", "Sale date", "Void reason"],
-    ...v.receipts.map((r) => [r.name, r.kind, r.total, new Date(r.datetime).toLocaleString("en-PH"), r.voidReason || ""]),
+    ...v.receipts.map((r) => [r.name, r.kind, r.total, gymDateTime(r.datetime), r.voidReason || ""]),
   ];
   downloadCSV(`rank-s-voided-${periodSlug()}.csv`, rows);
 }
@@ -438,7 +443,7 @@ function kindLabel(kind) {
             ₱{{ (c.fee + c.servicesTotal).toLocaleString() }}
             <span v-if="c.servicesTotal" style="font-size:10px; color:#7a8190;">(+{{ c.servicesTotal }})</span>
           </span>
-          <span style="font-size: 11.5px; color: #7a8190;">{{ new Date(c.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</span>
+          <span style="font-size: 11.5px; color: #7a8190;">{{ gymDateTime(c.datetime) }}</span>
           <span v-if="c.voided" style="font-size:10px; color:#e88; border:1px solid #5a2424; border-radius:4px; padding:2px 4px;">voided</span>
         </div>
         <Pagination
@@ -479,7 +484,7 @@ function kindLabel(kind) {
           <span style="font-weight: 600; font-size: 13px;">{{ t.name }}</span>
           <span style="font-size: 12px; color: #aab0bb;">{{ t.feeType }}</span>
           <span style="font-size: 12.5px; color: #5bb8f5;">₱{{ t.amount.toLocaleString() }}</span>
-          <span style="font-size: 11.5px; color: #7a8190;">{{ new Date(t.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</span>
+          <span style="font-size: 11.5px; color: #7a8190;">{{ gymDateTime(t.datetime) }}</span>
           <div>
             <span v-if="t.voidStatus === 'pending'" style="font-size:10px; color:#f3c44b; border:1px solid #5a4a14; border-radius:4px; padding:2px 5px;">pending</span>
             <button v-else-if="t.voidStatus !== 'approved' && t.id" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px; color:#e88;" @click="voidFor=t; voidReason=''; voidError=''">Void</button>
@@ -509,7 +514,7 @@ function kindLabel(kind) {
             <div v-for="item in t.items" :key="item.name" style="font-size: 12px; color: #aab0bb;">{{ item.name }} × {{ item.qty }}</div>
           </div>
           <span style="font-size: 12.5px; color: #5bb8f5;">₱{{ t.total.toLocaleString() }}</span>
-          <span style="font-size: 11.5px; color: #7a8190;">{{ new Date(t.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</span>
+          <span style="font-size: 11.5px; color: #7a8190;">{{ gymDateTime(t.datetime) }}</span>
           <div>
             <span v-if="t.voidStatus === 'pending'" style="font-size:10px; color:#f3c44b; border:1px solid #5a4a14; border-radius:4px; padding:2px 5px;">pending</span>
             <button v-else-if="t.voidStatus !== 'approved' && t.id" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px; color:#e88;" @click="voidFor=t; voidReason=''; voidError=''">Void</button>
@@ -536,7 +541,7 @@ function kindLabel(kind) {
           <span style="font-weight: 600; font-size: 13px;">{{ t.name }}</span>
           <span style="font-size: 12px; color: #aab0bb;">{{ t.plan }}</span>
           <span style="font-size: 12.5px; color: #5bb8f5;">₱{{ t.amount.toLocaleString() }}</span>
-          <span style="font-size: 11.5px; color: #7a8190;">{{ new Date(t.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</span>
+          <span style="font-size: 11.5px; color: #7a8190;">{{ gymDateTime(t.datetime) }}</span>
           <div>
             <span v-if="t.voidStatus === 'pending'" style="font-size:10px; color:#f3c44b; border:1px solid #5a4a14; border-radius:4px; padding:2px 5px;">pending</span>
             <button v-else-if="t.voidStatus !== 'approved' && t.id" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px; color:#e88;" @click="voidFor=t; voidReason=''; voidError=''">Void</button>
@@ -579,8 +584,8 @@ function kindLabel(kind) {
             <span style="font-size:12px; color:#aab0bb; text-transform:capitalize;">{{ c.type }}</span>
             <span style="font-size:12.5px; color:#e88; text-decoration:line-through;">₱{{ c.fee }}</span>
             <div style="font-size:11.5px; color:#7a8190;">
-              <div>Checked in: {{ new Date(c.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</div>
-              <div v-if="c.voidReviewedAt" style="color:#5d6470;">Voided: {{ new Date(c.voidReviewedAt).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</div>
+              <div>Checked in: {{ gymDateTime(c.datetime) }}</div>
+              <div v-if="c.voidReviewedAt" style="color:#5d6470;">Voided: {{ gymDateTime(c.voidReviewedAt) }}</div>
             </div>
           </div>
         </div>
@@ -606,8 +611,8 @@ function kindLabel(kind) {
             </div>
             <span style="font-size:12.5px; color:#e88; text-decoration:line-through;">₱{{ r.total.toLocaleString() }}</span>
             <div style="font-size:11.5px; color:#7a8190;">
-              <div>Sale: {{ new Date(r.datetime).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</div>
-              <div v-if="r.voidReviewedAt" style="color:#5d6470;">Voided: {{ new Date(r.voidReviewedAt).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) }}</div>
+              <div>Sale: {{ gymDateTime(r.datetime) }}</div>
+              <div v-if="r.voidReviewedAt" style="color:#5d6470;">Voided: {{ gymDateTime(r.voidReviewedAt) }}</div>
             </div>
           </div>
         </div>

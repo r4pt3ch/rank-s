@@ -1,4 +1,5 @@
 <script setup>
+const { gymDateTime } = useGymTime();
 const { data: products } = await useFetch("/api/products");
 const { data: receipts, refresh } = await useFetch("/api/receipts");
 const { data: receiptSettings } = await useFetch("/api/receipt-settings");
@@ -102,7 +103,7 @@ function reprint(r) {
             </div>
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
-            <span style="font-size: 11px; color: #7a8190;">{{ new Date(g.time).toLocaleString() }} · {{ g.issuedBy }}</span>
+            <span style="font-size: 11px; color: #7a8190;">{{ gymDateTime(g.time, { year: 'numeric' }) }} · {{ g.issuedBy }}</span>
             <button class="rs-btn-secondary" style="padding: 3px 8px; font-size: 11px;" @click="reprint({ id: g.ids[0], name: g.name, items: g.items, total: g.total, time: g.time, issuedBy: g.issuedBy })">Print</button>
           </div>
         </div>

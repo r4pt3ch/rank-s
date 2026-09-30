@@ -1,4 +1,5 @@
 <script setup>
+const { gymDateTime } = useGymTime();
 const { data: loginLogs } = await useFetch("/api/loginlogs");
 const { page, totalPages, paged, next, prev } = usePagination(loginLogs, 25);
 </script>
@@ -11,7 +12,7 @@ const { page, totalPages, paged, next, prev } = usePagination(loginLogs, 25);
       <div v-if="!loginLogs?.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No logins recorded yet.</div>
       <div v-for="l in paged" :key="l.id" class="rs-row" style="padding: 12px 18px;">
         <span style="font-size: 13.5px; font-weight: 600;">{{ l.name }}</span>
-        <span style="font-size: 12px; color: #7a8190;">{{ new Date(l.time).toLocaleString() }}</span>
+        <span style="font-size: 12px; color: #7a8190;">{{ gymDateTime(l.time, { year: 'numeric' }) }}</span>
         <span style="font-size: 11px; color: #5bb8f5;">{{ l.role }}</span>
       </div>
       <Pagination :page="page" :totalPages="totalPages" :total="loginLogs?.length || 0" :perPage="25" @prev="prev" @next="next" />

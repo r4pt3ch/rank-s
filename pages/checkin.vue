@@ -1,4 +1,5 @@
 <script setup>
+const { gymTime, gymDate, gymDateTime } = useGymTime();
 const { data: members } = await useFetch("/api/members");
 const { data: checkins, refresh } = await useFetch("/api/checkins", { query: { today: "1" } });
 const { data: allServices } = await useFetch("/api/services");
@@ -268,7 +269,7 @@ async function purchaseWeeklyPass() {
             ₱{{ (c.fee + (c.servicesTotal || 0)).toLocaleString() }}
             <span v-if="c.servicesTotal" style="font-size:10px; color:#7a8190;"> (₱{{ c.fee }} + ₱{{ c.servicesTotal }})</span>
           </span>
-          <span style="font-size:11px; color:#7a8190;">{{ new Date(c.time).toLocaleTimeString() }}</span>
+          <span style="font-size:11px; color:#7a8190;">{{ gymTime(c.time) }}</span>
           <RankBadge v-if="c.rank" :rank="c.rank" size="sm" />
           <button v-if="!c.voided && c.voidStatus !== 'pending'" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px;" @click="reopenServices(c)">+ Service</button>
           <button v-if="!c.voided && c.voidStatus !== 'pending'" class="rs-btn-secondary" style="padding:3px 7px; font-size:11px; color:#e88;" @click="requestVoid(c)">Void</button>
@@ -305,7 +306,7 @@ async function purchaseWeeklyPass() {
           Void check-in for <b>{{ voidFor.name }}</b> (₱{{ voidFor.fee }}<span v-if="voidFor.servicesTotal"> + ₱{{ voidFor.servicesTotal }} services</span>).
           This requires super admin approval before it's removed from reports.
         </p>
-        <div style="font-size:11.5px;color:#5d6470;margin-bottom:14px;">Checked in at {{ voidFor.time ? new Date(voidFor.time).toLocaleTimeString() : "" }}</div>
+        <div style="font-size:11.5px;color:#5d6470;margin-bottom:14px;">Checked in at {{ voidFor.time ? gymTime(voidFor.time) : "" }}</div>
         <label style="font-size:12px;color:#9aa1ab;display:block;margin-bottom:6px;">Reason for void</label>
         <input v-model="voidReason" class="rs-input" placeholder="e.g. Wrong member checked in, duplicate entry..." style="margin-bottom:10px;" />
         <div v-if="voidError" style="color:#e36b6b;font-size:12.5px;margin-bottom:10px;">{{ voidError }}</div>
@@ -327,7 +328,7 @@ async function purchaseWeeklyPass() {
           <div style="font-weight:600;margin-bottom:4px;">{{ reviewFor.name }}</div>
           <div style="color:#aab0bb;font-size:12px;">
             Fee: ₱{{ reviewFor.fee }}<span v-if="reviewFor.servicesTotal"> + ₱{{ reviewFor.servicesTotal }} services</span>
-            &nbsp;·&nbsp; Checked in {{ reviewFor.time ? new Date(reviewFor.time).toLocaleTimeString() : "" }}
+            &nbsp;·&nbsp; Checked in {{ reviewFor.time ? gymTime(reviewFor.time) : "" }}
           </div>
           <div style="color:#f3c44b;margin-top:8px;font-size:12px;">Void reason: "{{ reviewFor.voidReason }}"</div>
           <div style="color:#7a8190;margin-top:2px;font-size:11.5px;">Requested by {{ reviewFor.voidRequestedBy }}</div>

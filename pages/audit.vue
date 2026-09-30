@@ -1,4 +1,5 @@
 <script setup>
+const { gymDateTime } = useGymTime();
 const { data: auditTrail } = await useFetch("/api/audit");
 const { page, totalPages, paged, next, prev } = usePagination(auditTrail, 25);
 </script>
@@ -11,7 +12,7 @@ const { page, totalPages, paged, next, prev } = usePagination(auditTrail, 25);
       <div v-if="!auditTrail?.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No actions recorded yet.</div>
       <div v-for="a in paged" :key="a.id" style="padding: 12px 18px; border-bottom: 1px solid #1c2026;">
         <div style="font-size: 13px;">{{ a.action }}</div>
-        <div style="font-size: 11px; color: #7a8190; margin-top: 3px;">{{ new Date(a.time).toLocaleString() }} · {{ a.user }}</div>
+        <div style="font-size: 11px; color: #7a8190; margin-top: 3px;">{{ gymDateTime(a.time, { year: 'numeric' }) }} · {{ a.user }}</div>
       </div>
       <Pagination :page="page" :totalPages="totalPages" :total="auditTrail?.length || 0" :perPage="25" @prev="prev" @next="next" />
     </div>

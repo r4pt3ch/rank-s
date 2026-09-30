@@ -1,4 +1,5 @@
 <script setup>
+const { gymTime } = useGymTime();
 const { user } = useAuth();
 if (user.value?.role === "member") {
   await navigateTo("/profile");
@@ -109,7 +110,7 @@ async function resetDashboard() {
             style="display: grid; grid-template-columns: 1fr 110px 80px 70px; gap: 8px; align-items: center; padding: 9px 0; border-bottom: 1px solid #1c2026;"
             :style="{ opacity: c.voided ? 0.4 : 1 }">
             <span style="font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.name }}</span>
-            <span style="font-size: 12px; color: #7a8190;">{{ new Date(c.time).toLocaleTimeString() }}</span>
+            <span style="font-size: 12px; color: #7a8190;">{{ gymTime(c.time) }}</span>
             <div style="display:flex; justify-content:center;">
               <RankBadge v-if="c.rank" :rank="c.rank" size="sm" />
               <span v-else-if="c.visitType === 'weekly'" style="font-size:10px; color:#8ee0ab; border:1px solid #245a34; border-radius:4px; padding:2px 5px;">Walk-in · Weekly</span>

@@ -89,10 +89,7 @@ function computedExpiry(startDate, duration) {
   return d.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
 }
 
-function formatDate(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
-}
+const { gymDate: formatDate } = useGymTime();
 const newMember = ref({ firstName: "", lastName: "", email: "", phone: "", address: "", dob: "" });
 const addError = ref("");
 
