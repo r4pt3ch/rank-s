@@ -5,6 +5,13 @@ const isSuper = computed(() => user.value?.role === "superadmin");
 
 const { data, refresh } = await useFetch("/api/remittances");
 const { data: pendingVoids, refresh: refreshPending } = await useFetch("/api/remittance-void-requests");
+const { data: epay, refresh: refreshEpay } = await useFetch("/api/epayments");
+const route = useRoute();
+const entryTab = ref(route.query.tab === "epay" ? "epay" : "cash"); // 'cash' | 'epay'
+
+function refreshAll() {
+  return Promise.all([refresh(), refreshPending(), refreshEpay()]);
+}
 
 const bills = PESO_DENOMINATIONS.filter((d) => d.type === "bill");
 const coins = PESO_DENOMINATIONS.filter((d) => d.type === "coin");
@@ -50,7 +57,7 @@ const savedNotice = ref("");
 const confirmLines = computed(() =>
   PESO_DENOMINATIONS.filter((d) => count(d.key) > 0).map((d) => ({ ...d, count: count(d.key), amount: lineAmount(d) }))
 );
-const projectedRemitted = computed(() => (data.value?.todayRemitted || 0) + grandTotal.value);
+const projectedCollected = computed(() => (data.value?.todayRemitted || 0) + (data.value?.todayEpayments || 0) + grandTotal.value);
 
 async function save() {
   if (saving.value) return;
@@ -63,9 +70,8 @@ async function save() {
     });
     confirming.value = false;
     clearForm();
-    savedNotice.value = `Remittance of ${formatPeso(saved.totalCash)} saved.`;
-    setTimeout(() => (savedNotice.value = ""), 5000);
-    await refresh();
+    flash(`Remittance of ${formatPeso(saved.totalCash)} saved.`);
+    await refreshAll();
   } catch (e) {
     saveError.value = e.data?.statusMessage || "Could not save the remittance. Please try again.";
   } finally {
@@ -73,8 +79,90 @@ async function save() {
   }
 }
 
+let flashTimer = null;
+function flash(msg) {
+  savedNotice.value = msg;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => (savedNotice.value = ""), 5000);
+}
+
+// ---- Electronic payments (each one logged and saved as it comes in) ----
+function emptyEpay() {
+  return { provider: "", providerName: "", amount: "", referenceNo: "", payerName: "", senderAccount: "", notes: "" };
+}
+const ep = ref(emptyEpay());
+const epConfirming = ref(false);
+const epSaving = ref(false);
+const epError = ref("");
+
+const epProvider = computed(() => EPAY_PROVIDERS.find((p) => p.key === ep.value.provider) || null);
+const epAmount = computed(() => {
+  const n = Number(ep.value.amount);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+});
+const epLabel = computed(() => {
+  if (!epProvider.value) return "";
+  const custom = ep.value.providerName.trim();
+  if (epProvider.value.key === "other") return custom || "Other";
+  if (epProvider.value.key === "bank" && custom) return `Bank transfer (${custom})`;
+  return epProvider.value.label;
+});
+const epReady = computed(() =>
+  !!epProvider.value && epAmount.value > 0 && (epProvider.value.key !== "other" || !!ep.value.providerName.trim())
+);
+
+function sanitizeAmount() {
+  let v = String(ep.value.amount ?? "").replace(/[^\d.]/g, "");
+  const dot = v.indexOf(".");
+  if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, "").slice(0, 2);
+  ep.value.amount = v.replace(/^0+(?=\d)/, "").slice(0, 10);
+}
+function pickProvider(key) {
+  if (epConfirming.value) return;
+  if (ep.value.provider !== key) ep.value.providerName = "";
+  ep.value.provider = key;
+}
+function clearEpay() {
+  ep.value = emptyEpay();
+  epConfirming.value = false;
+  epError.value = "";
+}
+
+async function saveEpay() {
+  if (epSaving.value) return;
+  epSaving.value = true;
+  epError.value = "";
+  try {
+    const saved = await $fetch("/api/epayments", { method: "POST", body: { ...ep.value, amount: epAmount.value } });
+    clearEpay();
+    flash(`E-payment of ${formatPeso(saved.amount)} via ${saved.providerLabel} saved.`);
+    await refreshAll();
+  } catch (e) {
+    epError.value = e.data?.statusMessage || "Could not save the e-payment. Please try again.";
+    epConfirming.value = false; // back to the editable form so they can fix it
+  } finally {
+    epSaving.value = false;
+  }
+}
+
+const epayments = computed(() => epay.value?.payments || []);
+const epayByProvider = computed(() => {
+  const totals = {};
+  for (const p of epayments.value) {
+    if (p.voided) continue;
+    if (!totals[p.provider]) totals[p.provider] = { key: p.provider, label: epayProvider(p.provider).label, count: 0, amount: 0 };
+    totals[p.provider].count += 1;
+    totals[p.provider].amount = Math.round((totals[p.provider].amount + p.amount) * 100) / 100;
+  }
+  return Object.values(totals).sort((a, b) => b.amount - a.amount);
+});
+function providerColor(key) {
+  return epayProvider(key).color;
+}
+
 // ---- Today summary ----
-const difference = computed(() => Math.round(((data.value?.todayRemitted || 0) - (data.value?.todaySales || 0)) * 100) / 100);
+const todayCollected = computed(() => Math.round(((data.value?.todayRemitted || 0) + (data.value?.todayEpayments || 0)) * 100) / 100);
+const difference = computed(() => Math.round((todayCollected.value - (data.value?.todaySales || 0)) * 100) / 100);
 function diffLabel(n) {
   if (n === 0) return "Balanced";
   return n > 0 ? "Over" : "Short";
@@ -105,10 +193,11 @@ async function submitVoid() {
   voidBusy.value = true;
   voidError.value = "";
   try {
-    await $fetch(`/api/remittances/${voidFor.value.id}/void-request`, { method: "POST", body: { reason: voidReason.value } });
+    const base = voidFor.value.kind === "epayment" ? "/api/epayments" : "/api/remittances";
+    await $fetch(`${base}/${voidFor.value.id}/void-request`, { method: "POST", body: { reason: voidReason.value } });
     voidFor.value = null;
     voidReason.value = "";
-    await Promise.all([refresh(), refreshPending()]);
+    await refreshAll();
   } catch (e) {
     voidError.value = e.data?.statusMessage || "Could not submit the void request.";
   } finally {
@@ -127,18 +216,31 @@ async function review(action) {
   reviewBusy.value = true;
   reviewError.value = "";
   try {
-    await $fetch(`/api/remittances/${reviewFor.value.id}/void-review`, {
+    const base = reviewFor.value.kind === "epayment" ? "/api/epayments" : "/api/remittances";
+    await $fetch(`${base}/${reviewFor.value.id}/void-review`, {
       method: "POST",
       body: { action, rejectionReason: rejectionReason.value },
     });
     reviewFor.value = null;
     rejectionReason.value = "";
-    await Promise.all([refresh(), refreshPending()]);
+    await refreshAll();
   } catch (e) {
     reviewError.value = e.data?.statusMessage || "Could not update the request.";
   } finally {
     reviewBusy.value = false;
   }
+}
+
+function openVoid(item, kind) {
+  voidError.value = "";
+  voidReason.value = "";
+  voidFor.value = { ...item, kind };
+}
+function voidTitle(v) {
+  if (!v) return "";
+  return v.kind === "epayment"
+    ? `E-payment · ${formatPeso(v.amount)} via ${v.providerLabel}`
+    : `Cash remittance · ${prettyDate(v.businessDate)} · ${formatPeso(v.totalCash)}`;
 }
 
 function prettyDate(ymd) {
@@ -152,8 +254,8 @@ function prettyDate(ymd) {
   <div>
     <h1 style="font-size: 22px; font-weight: 800; margin: 0;">Sales remittance</h1>
     <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 22px;">
-      Count the cash on hand for today and record it by bill and coin. You can edit the counts freely until you save —
-      after that, a remittance can only be voided with super admin approval.
+      Count today's cash on hand by bill and coin, and log every GCash, Maya, GoTyme or other e-payment as it comes in.
+      Entries can be edited freely until saved — after that, they can only be voided with super admin approval.
     </p>
 
     <div v-if="savedNotice" style="background:#14261b;border:1px solid #24502f;color:#8ee0ab;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;">
@@ -161,8 +263,17 @@ function prettyDate(ymd) {
     </div>
 
     <div class="rs-mobile-stack" style="display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: start;">
-      <!-- ============ Entry form ============ -->
-      <div class="rs-card">
+      <!-- ============ Entry forms ============ -->
+      <div>
+      <div class="rem-tabs" role="tablist">
+        <button type="button" role="tab" :aria-selected="entryTab === 'cash'" :class="{ active: entryTab === 'cash' }" @click="entryTab = 'cash'">
+          Cash count <span v-if="hasEntries" class="rem-tab-pill">{{ formatPeso(grandTotal) }}</span>
+        </button>
+        <button type="button" role="tab" :aria-selected="entryTab === 'epay'" :class="{ active: entryTab === 'epay' }" @click="entryTab = 'epay'">
+          E-payments <span v-if="data?.todayEpaymentsCount" class="rem-tab-pill">{{ data.todayEpaymentsCount }} today</span>
+        </button>
+      </div>
+      <div class="rs-card" v-show="entryTab === 'cash'" style="border-top-left-radius: 0;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 4px;">
           <div style="font-weight: 700; font-size: 15px;">Cash count</div>
           <div style="font-size: 12px; color: #5bb8f5; font-weight: 600;">{{ prettyDate(data?.today) }}</div>
@@ -217,25 +328,168 @@ function prettyDate(ymd) {
         </div>
       </div>
 
+      <!-- E-payments -->
+      <div v-show="entryTab === 'epay'" style="display:flex; flex-direction:column; gap: 18px;">
+        <div class="rs-card" style="border-top-left-radius: 0;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 4px;">
+            <div style="font-weight: 700; font-size: 15px;">Log an e-payment</div>
+            <div style="font-size: 12px; color: #5bb8f5; font-weight: 600;">{{ prettyDate(data?.today) }}</div>
+          </div>
+          <div style="font-size: 12px; color: #7a8190; margin-bottom: 14px;">Record each payment as soon as it's received, using the details on the customer's payment screen.</div>
+
+          <fieldset :disabled="epConfirming || epSaving" style="border: none; padding: 0; margin: 0;">
+            <legend style="font-size: 12px; color: #9aa1ab; margin-bottom: 8px; padding: 0;">Paid via</legend>
+            <div style="display:flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;">
+              <button
+                v-for="p in EPAY_PROVIDERS" :key="p.key" type="button"
+                class="rem-chip" :class="{ active: ep.provider === p.key }"
+                :style="ep.provider === p.key ? { borderColor: p.color, color: '#e6e8eb', background: p.color + '22' } : {}"
+                :aria-pressed="ep.provider === p.key"
+                @click="pickProvider(p.key)"
+              >
+                <span class="rem-dot" :style="{ background: p.color }"></span>{{ p.label }}
+              </button>
+            </div>
+
+            <div v-if="ep.provider === 'other' || ep.provider === 'bank'" style="margin-bottom: 12px;">
+              <label style="font-size: 12px; color: #9aa1ab; display:block; margin-bottom: 6px;">
+                {{ ep.provider === "other" ? "App / channel name" : "Bank name (optional)" }}
+              </label>
+              <input v-model="ep.providerName" class="rs-input" maxlength="60" :placeholder="ep.provider === 'other' ? 'e.g. PalawanPay, Coins.ph' : 'e.g. BPI, BDO, UnionBank'" />
+            </div>
+
+            <label style="font-size: 12px; color: #9aa1ab; display:block; margin-bottom: 6px;">Amount received</label>
+            <div style="position: relative; margin-bottom: 12px;">
+              <span style="position:absolute; left: 14px; top: 50%; transform: translateY(-50%); color:#8a909b; font-weight: 700; font-size: 18px;">₱</span>
+              <input v-model="ep.amount" @input="sanitizeAmount" inputmode="decimal" class="rs-input" placeholder="0.00"
+                style="padding-left: 34px; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums;" aria-label="Amount received in pesos" />
+            </div>
+
+            <div class="rem-grid-2" style="margin-bottom: 12px;">
+              <div>
+                <label style="font-size: 12px; color: #9aa1ab; display:block; margin-bottom: 6px;">Reference no.</label>
+                <input v-model="ep.referenceNo" class="rs-input" maxlength="60" placeholder="From the payment receipt" />
+              </div>
+              <div>
+                <label style="font-size: 12px; color: #9aa1ab; display:block; margin-bottom: 6px;">Payer name</label>
+                <input v-model="ep.payerName" class="rs-input" maxlength="80" placeholder="Who paid" />
+              </div>
+              <div>
+                <label style="font-size: 12px; color: #9aa1ab; display:block; margin-bottom: 6px;">Sender number / account</label>
+                <input v-model="ep.senderAccount" class="rs-input" maxlength="40" placeholder="e.g. 0917•••4521" />
+              </div>
+              <div>
+                <label style="font-size: 12px; color: #9aa1ab; display:block; margin-bottom: 6px;">Notes</label>
+                <input v-model="ep.notes" class="rs-input" maxlength="300" placeholder="e.g. Monthly membership" />
+              </div>
+            </div>
+          </fieldset>
+
+          <div v-if="epError" style="color:#e36b6b; font-size: 12.5px; margin-bottom: 10px;">{{ epError }}</div>
+
+          <!-- Inline confirm: quick at a busy front desk, but still a deliberate second step -->
+          <div v-if="epConfirming" style="background:#0f1216; border: 1px solid #2f8fd6; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px;">
+              <div style="display:flex; align-items:center; gap: 8px; min-width: 0;">
+                <span class="rem-dot" :style="{ background: epProvider?.color }"></span>
+                <span style="font-weight: 700;">{{ epLabel }}</span>
+              </div>
+              <span style="font-weight: 800; font-size: 20px; color:#5bb8f5; font-variant-numeric: tabular-nums;">{{ formatPeso(epAmount) }}</span>
+            </div>
+            <div style="font-size: 12px; color:#aab0bb; margin-top: 6px; line-height: 1.6;">
+              <span v-if="ep.referenceNo">Ref {{ ep.referenceNo }}</span>
+              <span v-if="ep.payerName"> · from {{ ep.payerName }}</span>
+              <span v-if="ep.senderAccount"> · {{ ep.senderAccount }}</span>
+              <span v-if="ep.notes"> · {{ ep.notes }}</span>
+              <span v-if="!ep.referenceNo" style="color:#f3c44b;">No reference number — double-check before saving.</span>
+            </div>
+            <div style="font-size: 11.5px; color:#f3d8a8; margin-top: 8px;">Once saved, it can't be edited — only voided with super admin approval.</div>
+          </div>
+
+          <div style="display:flex; gap: 8px;">
+            <template v-if="!epConfirming">
+              <button type="button" class="rs-btn-secondary" :disabled="!ep.provider && !ep.amount" @click="clearEpay">Clear</button>
+              <button type="button" class="rs-btn-primary" style="flex: 1; justify-content:center;" :disabled="!epReady" @click="epError = ''; epConfirming = true">Review &amp; save</button>
+            </template>
+            <template v-else>
+              <button type="button" class="rs-btn-secondary" style="flex: 1; justify-content:center;" :disabled="epSaving" @click="epConfirming = false">Edit</button>
+              <button type="button" class="rs-btn-primary" style="flex: 1; justify-content:center;" :disabled="epSaving" :aria-busy="epSaving" @click="saveEpay">
+                <span v-if="epSaving" class="rs-spinner" aria-hidden="true"></span>
+                {{ epSaving ? "Saving..." : "Save payment" }}
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Today's e-payments -->
+        <div class="rs-card" style="padding: 0;">
+          <div style="padding: 14px 18px; border-bottom: 1px solid #1c2026;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight: 700; font-size: 14px;">Today's e-payments</span>
+              <span style="font-weight: 800; font-variant-numeric: tabular-nums;">{{ formatPeso(data?.todayEpayments) }}</span>
+            </div>
+            <div v-if="epayByProvider.length" style="display:flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;">
+              <span v-for="t in epayByProvider" :key="t.key" style="display:inline-flex; align-items:center; gap: 6px; font-size: 11.5px; background:#0f1216; border:1px solid #1f242c; border-radius: 999px; padding: 4px 10px;">
+                <span class="rem-dot" :style="{ background: providerColor(t.key) }"></span>
+                {{ t.label }} · {{ t.count }} · <b style="font-variant-numeric: tabular-nums;">{{ formatPeso(t.amount) }}</b>
+              </span>
+            </div>
+          </div>
+          <div v-if="!epayments.length" style="padding: 24px; text-align:center; color:#5d6470; font-size:13px;">No e-payments logged today.</div>
+          <div v-for="p in epayments" :key="p.id" style="display:flex; gap: 10px; align-items:flex-start; padding: 11px 18px; border-bottom: 1px solid #1c2026;">
+            <span class="rem-dot" :style="{ background: providerColor(p.provider), marginTop: '6px' }"></span>
+            <div style="flex:1; min-width:0;">
+              <div style="font-size: 13px; font-weight: 600;">
+                {{ p.providerLabel }}
+                <span v-if="p.payerName" style="font-weight: 400; color:#aab0bb;">· {{ p.payerName }}</span>
+              </div>
+              <div style="font-size: 11.5px; color:#7a8190; word-break: break-word;">
+                <span v-if="p.referenceNo">Ref {{ p.referenceNo }} · </span>
+                <span v-if="p.senderAccount">{{ p.senderAccount }} · </span>
+                {{ gymDateTime(p.createdAt) }} · {{ p.recordedBy }}
+              </div>
+              <div v-if="p.notes" style="font-size: 11.5px; color:#aab0bb;">{{ p.notes }}</div>
+              <div v-if="p.voidReason" style="font-size: 11.5px; color:#aab0bb;">Void reason: {{ p.voidReason }}</div>
+              <div v-if="p.voidStatus === 'rejected'" style="font-size: 11.5px; color:#7a8190;">Void rejected<span v-if="p.voidRejectionReason"> — {{ p.voidRejectionReason }}</span></div>
+            </div>
+            <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
+              <span style="font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums;" :style="{ textDecoration: p.voided ? 'line-through' : 'none', color: p.voided ? '#7a8190' : '#e6e8eb' }">{{ formatPeso(p.amount) }}</span>
+              <span v-if="p.voided || p.voidStatus === 'pending'" style="font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;" :style="{ color: statusBadge(p).color, background: statusBadge(p).bg }">{{ statusBadge(p).text }}</span>
+              <button v-else type="button" class="rem-link-danger" @click="openVoid(p, 'epayment')">Request void</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+
       <!-- ============ Right column ============ -->
       <div style="display:flex; flex-direction:column; gap: 18px;">
         <!-- Today -->
         <div class="rs-card">
           <div style="font-weight: 700; font-size: 14px; margin-bottom: 14px;">Today at a glance</div>
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div style="background:#0f1216; border:1px solid #1f242c; border-radius:10px; padding: 12px;">
-              <div style="font-size: 11px; color: #8a909b; margin-bottom: 6px;">Sales recorded in system</div>
-              <div style="font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums;">{{ formatPeso(data?.todaySales) }}</div>
-              <div style="font-size: 11px; color: #5d6470; margin-top: 3px;">{{ data?.todaySalesCount || 0 }} transactions</div>
+            <div class="rem-stat">
+              <div class="rem-stat-label">Cash remitted</div>
+              <div class="rem-stat-value">{{ formatPeso(data?.todayRemitted) }}</div>
             </div>
-            <div style="background:#0f1216; border:1px solid #1f242c; border-radius:10px; padding: 12px;">
-              <div style="font-size: 11px; color: #8a909b; margin-bottom: 6px;">Cash remitted today</div>
-              <div style="font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums;">{{ formatPeso(data?.todayRemitted) }}</div>
-              <div style="font-size: 11px; color: #5d6470; margin-top: 3px;">excludes voided</div>
+            <div class="rem-stat">
+              <div class="rem-stat-label">E-payments</div>
+              <div class="rem-stat-value">{{ formatPeso(data?.todayEpayments) }}</div>
+              <div class="rem-stat-sub">{{ data?.todayEpaymentsCount || 0 }} payment{{ data?.todayEpaymentsCount === 1 ? "" : "s" }}</div>
+            </div>
+            <div class="rem-stat" style="border-color:#2f8fd6;">
+              <div class="rem-stat-label" style="color:#5bb8f5;">Total collected</div>
+              <div class="rem-stat-value" style="color:#5bb8f5;">{{ formatPeso(todayCollected) }}</div>
+              <div class="rem-stat-sub">cash + e-payments</div>
+            </div>
+            <div class="rem-stat">
+              <div class="rem-stat-label">Sales recorded in system</div>
+              <div class="rem-stat-value">{{ formatPeso(data?.todaySales) }}</div>
+              <div class="rem-stat-sub">{{ data?.todaySalesCount || 0 }} transactions</div>
             </div>
           </div>
-          <div v-if="data?.todayRemitted" style="display:flex; justify-content:space-between; align-items:center; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background:#0f1216; border:1px solid #1f242c;">
-            <span style="font-size: 12.5px; color: #aab0bb;">Difference <span style="color:#5d6470;">(cash − recorded sales)</span></span>
+          <div v-if="todayCollected" style="display:flex; justify-content:space-between; align-items:center; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background:#0f1216; border:1px solid #1f242c;">
+            <span style="font-size: 12.5px; color: #aab0bb;">Difference <span style="color:#5d6470;">(collected − recorded sales)</span></span>
             <span style="font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums;" :style="{ color: diffColor(difference) }">
               {{ diffLabel(difference) }} {{ difference !== 0 ? formatPeso(Math.abs(difference)) : "" }}
             </span>
@@ -250,7 +504,8 @@ function prettyDate(ymd) {
           </div>
           <div v-for="p in pendingVoids" :key="p.id" style="padding: 10px 0; border-top: 1px solid #1c2026; display:flex; gap: 10px; align-items:center;">
             <div style="flex:1; min-width:0;">
-              <div style="font-size: 13px; font-weight: 600;">{{ prettyDate(p.businessDate) }} · {{ formatPeso(p.totalCash) }}</div>
+              <div style="font-size: 13px; font-weight: 600;">{{ voidTitle(p) }}</div>
+              <div v-if="p.kind === 'epayment'" style="font-size: 11.5px; color: #7a8190;">{{ prettyDate(p.businessDate) }}<span v-if="p.referenceNo"> · Ref {{ p.referenceNo }}</span><span v-if="p.payerName"> · {{ p.payerName }}</span></div>
               <div style="font-size: 11.5px; color: #aab0bb;">Reason: {{ p.voidReason }}</div>
               <div style="font-size: 11px; color: #5d6470;">Requested by {{ p.voidRequestedBy || "Unknown" }} · {{ gymDateTime(p.voidRequestedAt) }}</div>
             </div>
@@ -301,7 +556,7 @@ function prettyDate(ymd) {
                 v-if="!r.voided && r.voidStatus !== 'pending'"
                 class="rs-btn-secondary"
                 style="margin-top: 10px; font-size: 12px; padding: 6px 12px; color:#e88; border-color:#5a2424;"
-                @click="voidError = ''; voidReason = ''; voidFor = r"
+                @click="openVoid(r, 'remittance')"
               >Request void</button>
             </div>
           </div>
@@ -338,7 +593,7 @@ function prettyDate(ymd) {
         <div v-if="remarks" style="font-size: 12.5px; color:#aab0bb; margin-bottom: 12px;">Remarks: {{ remarks }}</div>
 
         <div style="font-size: 12px; color:#7a8190; margin-bottom: 12px;">
-          Today's remitted total will be {{ formatPeso(projectedRemitted) }} against {{ formatPeso(data?.todaySales) }} recorded sales.
+          Today's total collected (cash + e-payments) will be {{ formatPeso(projectedCollected) }} against {{ formatPeso(data?.todaySales) }} recorded sales.
         </div>
         <div style="background:#2a2414; border:1px solid #5a4f24; color:#f3d8a8; border-radius: 8px; padding: 10px 12px; font-size: 12.5px; margin-bottom: 14px;">
           Once saved, this can't be edited. Mistakes need a void request approved by the super admin.
@@ -363,10 +618,13 @@ function prettyDate(ymd) {
           <button @click="voidFor = null" style="background:transparent; border:none; color:#8a909b; cursor:pointer;">✕</button>
         </div>
         <div style="background:#1c2128; border-radius: 8px; padding: 12px; margin-bottom: 14px; font-size: 13px;">
-          <div style="font-weight: 600; margin-bottom: 4px;">Remittance · {{ prettyDate(voidFor.businessDate) }}</div>
-          <div style="color:#aab0bb; font-size: 12px;">{{ formatPeso(voidFor.totalCash) }} · saved by {{ voidFor.submittedBy }}</div>
+          <div style="font-weight: 600; margin-bottom: 4px;">{{ voidTitle(voidFor) }}</div>
+          <div v-if="voidFor.kind === 'epayment'" style="color:#aab0bb; font-size: 12px;">
+            <span v-if="voidFor.referenceNo">Ref {{ voidFor.referenceNo }} · </span><span v-if="voidFor.payerName">{{ voidFor.payerName }} · </span>logged by {{ voidFor.recordedBy }}
+          </div>
+          <div v-else style="color:#aab0bb; font-size: 12px;">Saved by {{ voidFor.submittedBy }}</div>
         </div>
-        <p style="font-size: 12.5px; color: #aab0bb; margin: 0 0 14px;">The super admin must approve this before the remittance is removed from reports. You can then save a corrected count.</p>
+        <p style="font-size: 12.5px; color: #aab0bb; margin: 0 0 14px;">The super admin must approve this before it's removed from reports. You can then save a corrected entry.</p>
         <label style="font-size: 12px; color: #9aa1ab; display:block; margin-bottom: 6px;">Reason for void</label>
         <input v-model="voidReason" class="rs-input" placeholder="e.g. Miscounted ₱100 bills" style="margin-bottom: 10px;" />
         <div v-if="voidError" style="color:#e36b6b; font-size: 12.5px; margin-bottom: 10px;">{{ voidError }}</div>
@@ -388,12 +646,18 @@ function prettyDate(ymd) {
           <button @click="reviewFor = null" style="background:transparent; border:none; color:#8a909b; cursor:pointer;">✕</button>
         </div>
         <div style="background:#1c2128; border-radius: 8px; padding: 12px; margin-bottom: 12px; font-size: 13px;">
-          <div style="font-weight: 600; margin-bottom: 4px;">Remittance · {{ prettyDate(reviewFor.businessDate) }} · {{ formatPeso(reviewFor.totalCash) }}</div>
-          <div style="color:#aab0bb; font-size: 12px;">Saved by {{ reviewFor.submittedBy }} · {{ gymDateTime(reviewFor.createdAt) }}</div>
+          <div style="font-weight: 600; margin-bottom: 4px;">{{ voidTitle(reviewFor) }}</div>
+          <div v-if="reviewFor.kind === 'epayment'" style="color:#aab0bb; font-size: 12px; line-height: 1.6;">
+            <div v-if="reviewFor.referenceNo">Ref {{ reviewFor.referenceNo }}</div>
+            <div v-if="reviewFor.payerName || reviewFor.senderAccount">From {{ reviewFor.payerName }} {{ reviewFor.senderAccount }}</div>
+            <div v-if="reviewFor.notes">{{ reviewFor.notes }}</div>
+            <div>Logged by {{ reviewFor.recordedBy }} · {{ gymDateTime(reviewFor.createdAt) }}</div>
+          </div>
+          <div v-else style="color:#aab0bb; font-size: 12px;">Saved by {{ reviewFor.submittedBy }} · {{ gymDateTime(reviewFor.createdAt) }}</div>
           <div style="color:#aab0bb; font-size: 12px; margin-top: 6px;">Reason: {{ reviewFor.voidReason }}</div>
           <div style="color:#7a8190; font-size: 11.5px;">Requested by {{ reviewFor.voidRequestedBy }}</div>
         </div>
-        <div style="background:#0f1216; border:1px solid #1f242c; border-radius: 10px; padding: 8px 12px; margin-bottom: 12px;">
+        <div v-if="reviewFor.kind !== 'epayment'" style="background:#0f1216; border:1px solid #1f242c; border-radius: 10px; padding: 8px 12px; margin-bottom: 12px;">
           <div v-for="d in reviewFor.denominations" :key="d.key" style="display:flex; justify-content:space-between; font-size: 12px; color:#aab0bb; padding: 2px 0; font-variant-numeric: tabular-nums;">
             <span>{{ formatPeso(d.value) }} {{ d.type }} × {{ d.count }}</span>
             <span>{{ formatPeso(Math.round(d.value * 100) * d.count / 100) }}</span>
@@ -425,6 +689,50 @@ function prettyDate(ymd) {
   flex-shrink: 0;
 }
 .rem-step:disabled { opacity: 0.35; cursor: default; }
+.rem-tabs { display: flex; gap: 4px; }
+.rem-tabs button {
+  background: #111419;
+  color: #8a909b;
+  border: 1px solid #1f242c;
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: -1px;
+  position: relative;
+}
+.rem-tabs button.active { background: #13161b; color: #5bb8f5; border-color: #232730; z-index: 1; }
+.rem-tab-pill { font-size: 10.5px; background: #1c2128; color: #aab0bb; padding: 2px 7px; border-radius: 999px; font-weight: 600; }
+.rem-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #0f1216;
+  color: #aab0bb;
+  border: 1px solid #2a2f38;
+  border-radius: 999px;
+  padding: 8px 13px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rem-chip:disabled { cursor: default; opacity: 0.7; }
+.rem-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.rem-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rem-stat { background: #0f1216; border: 1px solid #1f242c; border-radius: 10px; padding: 12px; }
+.rem-stat-label { font-size: 11px; color: #8a909b; margin-bottom: 6px; }
+.rem-stat-value { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rem-stat-sub { font-size: 11px; color: #5d6470; margin-top: 3px; }
+.rem-link-danger { background: transparent; border: none; color: #e88; font-size: 11.5px; cursor: pointer; padding: 0; }
+.rem-link-danger:hover { text-decoration: underline; }
+@media (max-width: 768px) {
+  .rem-grid-2 { grid-template-columns: 1fr; }
+}
 .rem-overlay {
   position: fixed;
   inset: 0;

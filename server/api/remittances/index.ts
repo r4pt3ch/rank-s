@@ -1,4 +1,5 @@
 import Remittance from "../../utils/models/Remittance";
+import EPayment from "../../utils/models/EPayment";
 import { connectDB } from "../../utils/db";
 import { requireRole } from "../../utils/auth";
 import { logAudit } from "../../utils/helpers";
@@ -17,11 +18,15 @@ export default defineEventHandler(async (event) => {
     const utcOffset = await getUtcOffset();
     const today = gymDayKey(new Date(), utcOffset);
 
-    const [sales, todayAgg, recent] = await Promise.all([
+    const [sales, todayAgg, epayAgg, recent] = await Promise.all([
       todaysRecordedSales(utcOffset),
       Remittance.aggregate([
         { $match: { businessDate: today, voided: { $ne: true } } },
         { $group: { _id: null, total: { $sum: "$totalCash" } } },
+      ]),
+      EPayment.aggregate([
+        { $match: { businessDate: today, voided: { $ne: true } } },
+        { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
       ]),
       Remittance.find()
         .sort({ createdAt: -1 })
@@ -38,6 +43,8 @@ export default defineEventHandler(async (event) => {
       todaySales: sales.total,
       todaySalesCount: sales.count,
       todayRemitted: Math.round(todayRemitted * 100) / 100,
+      todayEpayments: Math.round((epayAgg[0]?.total || 0) * 100) / 100,
+      todayEpaymentsCount: epayAgg[0]?.count || 0,
       records: recent.map(serializeRemittance),
     };
   }

@@ -2,6 +2,8 @@ import CheckIn from "../utils/models/CheckIn";
 import Receipt from "../utils/models/Receipt";
 import Settings from "../utils/models/Settings";
 import Remittance from "../utils/models/Remittance";
+import EPayment from "../utils/models/EPayment";
+import { EPAY_PROVIDERS } from "../../utils/epay";
 import { PESO_DENOMINATIONS } from "../../utils/peso";
 import { connectDB } from "../utils/db";
 import { requireRole } from "../utils/auth";
@@ -72,12 +74,17 @@ export default defineEventHandler(async (event) => {
   const startDay = dayKey(start, utcOffset);
   const endDay = dayKey(end, utcOffset);
 
-  const [checkins, receipts, voidedCheckins, voidedReceipts, remittances] = await Promise.all([
+  const [checkins, receipts, voidedCheckins, voidedReceipts, remittances, epayments] = await Promise.all([
     CheckIn.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
     Receipt.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
     CheckIn.find({ createdAt: { $gte: start, $lte: end }, voided: true }).lean(),
     Receipt.find({ createdAt: { $gte: start, $lte: end }, voided: true }).lean(),
     Remittance.find({ businessDate: { $gte: startDay, $lte: endDay } })
+      .populate("voidRequestedBy", "name")
+      .populate("voidReviewedBy", "name")
+      .sort({ createdAt: -1 })
+      .lean(),
+    EPayment.find({ businessDate: { $gte: startDay, $lte: endDay } })
       .populate("voidRequestedBy", "name")
       .populate("voidReviewedBy", "name")
       .sort({ createdAt: -1 })
@@ -263,8 +270,23 @@ export default defineEventHandler(async (event) => {
     remitByDay[r.businessDate].count += 1;
     for (const d of r.denominations || []) denomTotals[d.key] = (denomTotals[d.key] || 0) + d.count;
   }
-  const allDays = Array.from(new Set([...Object.keys(salesByDay), ...Object.keys(remitByDay)])).sort().reverse();
+  const activeEpays = epayments.filter((p: any) => !p.voided);
+  const voidedEpays = epayments.filter((p: any) => p.voided);
+  const epayByDay: Record<string, { amount: number; count: number }> = {};
+  const epayByProvider: Record<string, { count: number; amount: number }> = {};
+  for (const p of activeEpays as any[]) {
+    if (!epayByDay[p.businessDate]) epayByDay[p.businessDate] = { amount: 0, count: 0 };
+    epayByDay[p.businessDate].amount += p.amount;
+    epayByDay[p.businessDate].count += 1;
+    if (!epayByProvider[p.provider]) epayByProvider[p.provider] = { count: 0, amount: 0 };
+    epayByProvider[p.provider].count += 1;
+    epayByProvider[p.provider].amount += p.amount;
+  }
+
+  const allDays = Array.from(new Set([...Object.keys(salesByDay), ...Object.keys(remitByDay), ...Object.keys(epayByDay)])).sort().reverse();
   const remitTotal = round2(activeRemits.reduce((s: number, r: any) => s + r.totalCash, 0));
+  const epayTotal = round2(activeEpays.reduce((s: number, p: any) => s + p.amount, 0));
+  const collectedTotal = round2(remitTotal + epayTotal);
   const salesTotal = round2(receipts.reduce((s, r) => s + r.total, 0));
 
   const serializeRemit = (r: any) => ({
@@ -284,19 +306,57 @@ export default defineEventHandler(async (event) => {
     voidReviewedAt: r.voidReviewedAt || null,
   });
 
+  const serializeEpay = (p: any) => ({
+    id: String(p._id),
+    businessDate: p.businessDate,
+    provider: p.provider,
+    providerLabel: p.providerLabel,
+    amount: p.amount,
+    referenceNo: p.referenceNo || "",
+    payerName: p.payerName || "",
+    senderAccount: p.senderAccount || "",
+    notes: p.notes || "",
+    recordedBy: p.recordedByName || "Unknown",
+    datetime: p.createdAt,
+    voidStatus: p.voidStatus || "none",
+    voidReason: p.voidReason || null,
+    voidRequestedBy: p.voidRequestedBy?.name || null,
+    voidReviewedBy: p.voidReviewedBy?.name || null,
+    voidReviewedAt: p.voidReviewedAt || null,
+  });
+
   const remittance = {
-    totalRemitted: remitTotal,
+    totalRemitted: remitTotal,          // cash only
+    totalEpayments: epayTotal,
+    totalCollected: collectedTotal,     // cash + e-payments
     totalRecordedSales: salesTotal,
-    variance: round2(remitTotal - salesTotal),
+    variance: round2(collectedTotal - salesTotal),
     count: activeRemits.length,
+    epaymentCount: activeEpays.length,
     daysRemitted: Object.keys(remitByDay).length,
-    daysWithSalesNotRemitted: allDays.filter((d) => salesByDay[d] && !remitByDay[d]).length,
-    pendingVoids: activeRemits.filter((r: any) => r.voidStatus === "pending").length,
+    // A day with sales but nothing collected (no cash count and no e-payments logged)
+    daysWithSalesNotRemitted: allDays.filter((d) => salesByDay[d] && !remitByDay[d] && !epayByDay[d]).length,
+    pendingVoids:
+      activeRemits.filter((r: any) => r.voidStatus === "pending").length +
+      activeEpays.filter((p: any) => p.voidStatus === "pending").length,
     byDay: allDays.map((date) => {
       const remitted = round2(remitByDay[date]?.remitted || 0);
+      const epay = round2(epayByDay[date]?.amount || 0);
+      const collected = round2(remitted + epay);
       const sales = round2(salesByDay[date] || 0);
-      return { date, remitted, sales, variance: round2(remitted - sales), count: remitByDay[date]?.count || 0 };
+      return {
+        date, remitted, epay, collected, sales,
+        variance: round2(collected - sales),
+        count: remitByDay[date]?.count || 0,
+        epayCount: epayByDay[date]?.count || 0,
+      };
     }),
+    epayByProvider: EPAY_PROVIDERS
+      .filter((p) => epayByProvider[p.key])
+      .map((p) => ({ key: p.key, label: p.label, count: epayByProvider[p.key].count, amount: round2(epayByProvider[p.key].amount) }))
+      .sort((a, b) => b.amount - a.amount),
+    epayments: activeEpays.map(serializeEpay),
+    voidedEpayments: voidedEpays.map(serializeEpay),
     denominations: PESO_DENOMINATIONS.map((d) => ({
       key: d.key,
       label: d.label,

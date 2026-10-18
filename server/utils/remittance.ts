@@ -22,6 +22,30 @@ export async function todaysRecordedSales(utcOffset: number) {
   return { total: rows[0]?.total || 0, count: rows[0]?.count || 0 };
 }
 
+export function serializeEPayment(p: any) {
+  return {
+    id: String(p._id),
+    businessDate: p.businessDate,
+    provider: p.provider,
+    providerLabel: p.providerLabel,
+    amount: p.amount,
+    referenceNo: p.referenceNo || "",
+    payerName: p.payerName || "",
+    senderAccount: p.senderAccount || "",
+    notes: p.notes || "",
+    recordedBy: p.recordedByName || "Unknown",
+    createdAt: p.createdAt,
+    voided: !!p.voided,
+    voidStatus: p.voidStatus || "none",
+    voidReason: p.voidReason || null,
+    voidRequestedAt: p.voidRequestedAt || null,
+    voidRequestedBy: p.voidRequestedBy?.name || null,
+    voidReviewedAt: p.voidReviewedAt || null,
+    voidReviewedBy: p.voidReviewedBy?.name || null,
+    voidRejectionReason: p.voidRejectionReason || null,
+  };
+}
+
 export function serializeRemittance(r: any) {
   return {
     id: String(r._id),
