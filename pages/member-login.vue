@@ -7,14 +7,14 @@ const error = ref("");
 const loading = ref(false);
 
 async function submit() {
+  if (loading.value) return;
   error.value = "";
   loading.value = true;
   try {
     await memberLogin(pin.value);
     await navigateTo("/profile");
   } catch (e) {
-    error.value = e.data?.statusMessage || "Login failed.";
-  } finally {
+    error.value = e.data?.statusMessage || "Login failed. Please try again.";
     loading.value = false;
   }
 }
@@ -31,9 +31,10 @@ async function submit() {
 
       <form @submit.prevent="submit" style="margin-top: 22px;">
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Your PIN</label>
-        <input v-model="pin" maxlength="6" class="rs-input" placeholder="PIN" style="text-align: center; font-size: 18px; letter-spacing: 2px;" />
+        <input v-model="pin" maxlength="6" class="rs-input" :disabled="loading" inputmode="numeric" placeholder="PIN" style="text-align: center; font-size: 18px; letter-spacing: 2px;" />
         <div v-if="error" style="color: #e36b6b; font-size: 12.5px; margin-top: 12px;">{{ error }}</div>
-        <button type="submit" class="rs-btn-primary" style="margin-top: 22px; width: 100%; justify-content: center;" :disabled="!pin || loading">
+        <button type="submit" class="rs-btn-primary" style="margin-top: 22px; width: 100%; justify-content: center;" :disabled="!pin || loading" :aria-busy="loading">
+          <span v-if="loading" class="rs-spinner" aria-hidden="true"></span>
           {{ loading ? "Signing in..." : "Sign in" }}
         </button>
       </form>

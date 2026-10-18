@@ -113,3 +113,16 @@ html, body { overflow-x: hidden; }
   /* Full-width buttons on mobile */
   .rs-btn-primary, .rs-btn-secondary { font-size: 12px !important; }
 }
+
+/* Loading spinner (used on login buttons) */
+@keyframes rs-spin { to { transform: rotate(360deg); } }
+.rs-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: rs-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+.rs-btn-primary:disabled { opacity: 0.75; cursor: wait; }

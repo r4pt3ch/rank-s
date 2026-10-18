@@ -32,11 +32,11 @@ export async function getSessionUser(event: H3Event) {
     const decoded = jwt.verify(token, config.jwtSecret) as { id: string; role: string };
     await connectDB();
     if (decoded.role === "member") {
-      const member = await Member.findById(decoded.id).lean();
+      const member = await Member.findById(decoded.id).select("_id name").lean();
       if (!member) return null;
       return { id: String(member._id), username: null, name: member.name, role: "member", memberId: String(member._id) };
     }
-    const user = await User.findById(decoded.id).lean();
+    const user = await User.findById(decoded.id).select("_id username name role").lean();
     if (!user) return null;
     return { id: String(user._id), username: user.username, name: user.name, role: user.role };
   } catch {

@@ -5,14 +5,18 @@ const { login } = useAuth();
 const username = ref("");
 const password = ref("");
 const error = ref("");
+const loading = ref(false);
 
 async function submitStaff() {
+  if (loading.value) return;
   error.value = "";
+  loading.value = true;
   try {
     const u = await login(username.value, password.value);
     await navigateTo(u.role === "member" ? "/profile" : "/");
   } catch (e) {
-    error.value = e.data?.statusMessage || "Login failed.";
+    error.value = e.data?.statusMessage || "Login failed. Please try again.";
+    loading.value = false;
   }
 }
 </script>
@@ -28,11 +32,14 @@ async function submitStaff() {
 
       <form @submit.prevent="submitStaff" style="margin-top: 22px;">
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin-bottom: 6px;">Username</label>
-        <input v-model="username" class="rs-input" placeholder="super or admin" />
+        <input v-model="username" class="rs-input" placeholder="super or admin" :disabled="loading" autocomplete="username" />
         <label style="font-size: 12px; color: #9aa1ab; display: block; margin: 16px 0 6px;">Password</label>
-        <input v-model="password" type="password" class="rs-input" placeholder="••••••••" />
+        <input v-model="password" type="password" class="rs-input" placeholder="••••••••" :disabled="loading" autocomplete="current-password" />
         <div v-if="error" style="color: #e36b6b; font-size: 12.5px; margin-top: 12px;">{{ error }}</div>
-        <button type="submit" class="rs-btn-primary" style="margin-top: 22px; width: 100%; justify-content: center;">Sign in</button>
+        <button type="submit" class="rs-btn-primary" style="margin-top: 22px; width: 100%; justify-content: center;" :disabled="loading" :aria-busy="loading">
+          <span v-if="loading" class="rs-spinner" aria-hidden="true"></span>
+          {{ loading ? "Signing in..." : "Sign in" }}
+        </button>
       </form>
 
       <div style="margin-top: 18px; font-size: 11.5px; color: #5d6470; text-align: center;">

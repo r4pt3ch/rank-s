@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: "PIN is required." });
   }
   await connectDB();
-  const member = await Member.findOne({ pin: String(pin) });
+  const member = await Member.findOne({ pin: String(pin) }).select("_id name").lean();
   if (!member) {
     throw createError({ statusCode: 401, statusMessage: "Incorrect PIN." });
   }
