@@ -1,6 +1,7 @@
 <script setup>
 const { gymDateTime, gymDate, gymTime, offset } = useGymTime();
-const view = ref("goers"); // 'goers' | 'checkin' | 'inventory' | 'membership' | 'registered'
+const route = useRoute();
+const view = ref(route.query.view ? String(route.query.view) : "goers"); // 'goers' | 'checkin' | 'inventory' | 'membership' | 'registered' | 'remittance'
 const period = ref("daily");
 const customStart = ref("");
 const customEnd = ref("");
@@ -63,6 +64,7 @@ const views = [
   { id: "inventory",  label: "Inventory & services" },
   { id: "membership", label: "Membership sales" },
   { id: "registered", label: "Registered members" },
+  { id: "remittance", label: "Sales remittance" },
   { id: "voided",     label: "Voided" },
 ];
 const periods = [
@@ -261,6 +263,51 @@ function exportVoided() {
   downloadCSV(`rank-s-voided-${periodSlug()}.csv`, rows);
 }
 
+function exportRemittance() {
+  if (!data.value?.remittance) return;
+  const r = data.value.remittance;
+  const rows = [
+    ["Rank S — Sales Remittance", period.value, rangeLabel.value],
+    [],
+    ["Total cash remitted", r.totalRemitted],
+    ["Sales recorded in system", r.totalRecordedSales],
+    ["Difference (cash - sales)", r.variance],
+    ["Remittances saved", r.count],
+    ["Days with sales but no remittance", r.daysWithSalesNotRemitted],
+    [],
+    ["--- By day ---"],
+    ["Date", "Remittances", "Cash remitted", "Recorded sales", "Difference", "Status"],
+    ...r.byDay.map((d) => [d.date, d.count, d.remitted, d.sales, d.variance, remitStatus(d).text]),
+    [],
+    ["--- Denomination totals ---"],
+    ["Denomination", "Type", "Pieces", "Amount"],
+    ...r.denominations.filter((d) => d.count > 0).map((d) => [d.label, d.type, d.count, d.amount]),
+    [],
+    ["--- Remittance records ---"],
+    ["Business date", "Saved at", "Saved by", "Bills", "Coins", "Total cash", "Breakdown", "Remarks", "Void status"],
+    ...r.records.map((x) => [
+      x.businessDate, gymDateTime(x.datetime, { year: "numeric" }), x.submittedBy, x.billsTotal, x.coinsTotal, x.totalCash,
+      x.denominations.map((d) => `${d.type === "coin" ? "coin " : ""}${d.value}x${d.count}`).join(" | "),
+      x.remarks, x.voidStatus === "pending" ? "Void pending" : x.voidStatus === "rejected" ? "Void rejected" : "",
+    ]),
+    [],
+    ["--- Voided remittances ---"],
+    ["Business date", "Saved by", "Total cash", "Void reason", "Approved by", "Voided at"],
+    ...r.voided.map((x) => [x.businessDate, x.submittedBy, x.totalCash, x.voidReason || "", x.voidReviewedBy || "", gymDateTime(x.voidReviewedAt, { year: "numeric" })]),
+  ];
+  downloadCSV(`rank-s-sales-remittance-${periodSlug()}.csv`, rows);
+}
+
+function peso2(n) {
+  return "₱" + Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function remitStatus(d) {
+  if (!d.count && d.sales > 0) return { text: "Not remitted", color: "#e88" };
+  if (d.variance === 0) return { text: "Balanced", color: "#8ee0ab" };
+  return d.variance > 0 ? { text: "Over", color: "#f3c44b" } : { text: "Short", color: "#e88" };
+}
+const expandedRemit = ref(null);
+
 function exportCurrent() {
   if (view.value === "goers") exportGoers();
   else if (view.value === "checkinlist") exportCheckinList();
@@ -268,6 +315,7 @@ function exportCurrent() {
   else if (view.value === "inventory") exportInventory();
   else if (view.value === "registered") exportRegistered();
   else if (view.value === "voided") exportVoided();
+  else if (view.value === "remittance") exportRemittance();
   else exportMembership();
 }
 
@@ -619,6 +667,112 @@ function kindLabel(kind) {
       </div>
     </template>
 
+    <!-- Sales remittance view -->
+    <template v-else-if="data && !pending && view === 'remittance' && data.remittance">
+      <p style="font-size: 12.5px; color: #5d6470; margin: -8px 0 16px;">
+        Cash on hand counted by staff compared with sales recorded in the system. Voided remittances are listed separately and excluded from totals.
+        <NuxtLink to="/remittance" style="color:#5bb8f5; text-decoration:none; margin-left: 4px;">Record a remittance →</NuxtLink>
+      </p>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px;" class="rs-remit-cards">
+        <div class="rs-card" style="padding: 16px; border-color: #2f8fd6;">
+          <div style="font-size: 12px; color: #5bb8f5; margin-bottom: 10px;">Cash remitted</div>
+          <div style="font-size: 22px; font-weight: 800; color:#5bb8f5;">{{ peso2(data.remittance.totalRemitted) }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">{{ data.remittance.count }} remittance{{ data.remittance.count === 1 ? "" : "s" }}</div>
+        </div>
+        <div class="rs-card" style="padding: 16px;">
+          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Sales recorded</div>
+          <div style="font-size: 22px; font-weight: 800;">{{ peso2(data.remittance.totalRecordedSales) }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">check-in, POS & memberships</div>
+        </div>
+        <div class="rs-card" style="padding: 16px;">
+          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Difference</div>
+          <div style="font-size: 22px; font-weight: 800;" :style="{ color: data.remittance.variance === 0 ? '#8ee0ab' : data.remittance.variance > 0 ? '#f3c44b' : '#e88' }">
+            {{ data.remittance.variance > 0 ? "+" : data.remittance.variance < 0 ? "−" : "" }}{{ peso2(Math.abs(data.remittance.variance)) }}
+          </div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">{{ data.remittance.variance === 0 ? "balanced" : data.remittance.variance > 0 ? "over" : "short" }}</div>
+        </div>
+        <div class="rs-card" style="padding: 16px;" :style="{ borderColor: data.remittance.daysWithSalesNotRemitted ? '#5a2424' : '' }">
+          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Days not remitted</div>
+          <div style="font-size: 22px; font-weight: 800;" :style="{ color: data.remittance.daysWithSalesNotRemitted ? '#e88' : '' }">{{ data.remittance.daysWithSalesNotRemitted }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">had sales, no cash count</div>
+        </div>
+      </div>
+
+      <!-- By day -->
+      <div class="rs-card" style="padding: 0; margin-bottom: 18px;">
+        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">By day</div>
+        <div v-if="!data.remittance.byDay.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No sales or remittances in this period.</div>
+        <div v-else class="rs-table-scroll">
+          <div style="min-width: 560px;">
+            <div style="display:grid; grid-template-columns: 1.2fr 0.7fr 1fr 1fr 1fr 0.9fr; gap: 8px; padding: 10px 18px; font-size: 11px; color: #5d6470; border-bottom: 1px solid #1c2026;">
+              <span>Date</span><span style="text-align:right;">Counts</span><span style="text-align:right;">Cash remitted</span><span style="text-align:right;">Recorded sales</span><span style="text-align:right;">Difference</span><span style="text-align:right;">Status</span>
+            </div>
+            <div v-for="d in data.remittance.byDay" :key="d.date" style="display:grid; grid-template-columns: 1.2fr 0.7fr 1fr 1fr 1fr 0.9fr; gap: 8px; padding: 10px 18px; border-bottom: 1px solid #1c2026; font-size: 12.5px; font-variant-numeric: tabular-nums;">
+              <span style="font-weight: 600;">{{ d.date }}</span>
+              <span style="text-align:right; color:#aab0bb;">{{ d.count }}</span>
+              <span style="text-align:right;">{{ peso2(d.remitted) }}</span>
+              <span style="text-align:right; color:#aab0bb;">{{ peso2(d.sales) }}</span>
+              <span style="text-align:right;" :style="{ color: remitStatus(d).color }">{{ d.variance > 0 ? "+" : d.variance < 0 ? "−" : "" }}{{ peso2(Math.abs(d.variance)) }}</span>
+              <span style="text-align:right; font-weight:600; font-size: 11.5px;" :style="{ color: remitStatus(d).color }">{{ remitStatus(d).text }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 18px; margin-bottom: 18px;" class="rs-mobile-stack">
+        <!-- Denomination totals -->
+        <div class="rs-card" style="padding: 0;">
+          <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">Bills &amp; coins counted</div>
+          <div v-for="d in data.remittance.denominations" :key="d.key" style="display:grid; grid-template-columns: 1fr 60px 1fr; gap: 8px; padding: 8px 18px; border-bottom: 1px solid #1c2026; font-size: 12.5px; font-variant-numeric: tabular-nums;" :style="{ color: d.count ? '#e6e8eb' : '#5d6470' }">
+            <span>{{ d.label }} <span style="color:#5d6470; font-size: 11px;">{{ d.type }}</span></span>
+            <span style="text-align:right;">× {{ d.count }}</span>
+            <span style="text-align:right;">{{ peso2(d.amount) }}</span>
+          </div>
+        </div>
+
+        <!-- Records -->
+        <div class="rs-card" style="padding: 0;">
+          <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">Remittance records</div>
+          <div v-if="!data.remittance.records.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No remittances saved in this period.</div>
+          <div v-for="x in data.remittance.records" :key="x.id" style="border-bottom: 1px solid #1c2026;">
+            <button type="button" @click="expandedRemit = expandedRemit === x.id ? null : x.id" :aria-expanded="expandedRemit === x.id"
+              style="all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display:flex; align-items:center; gap: 10px; padding: 11px 18px;">
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 13px; font-weight: 600;">{{ x.businessDate }}</div>
+                <div style="font-size: 11px; color: #7a8190;">{{ x.submittedBy }} · {{ gymDateTime(x.datetime) }}</div>
+              </div>
+              <span v-if="x.voidStatus === 'pending'" style="font-size: 10.5px; font-weight: 700; color:#f3c44b; background:#2a2414; padding: 3px 8px; border-radius: 999px;">Void pending</span>
+              <span style="font-weight: 800; font-size: 13.5px; font-variant-numeric: tabular-nums;">{{ peso2(x.totalCash) }}</span>
+              <span style="color:#5d6470; font-size: 10px;">{{ expandedRemit === x.id ? "▾" : "▸" }}</span>
+            </button>
+            <div v-if="expandedRemit === x.id" style="padding: 0 18px 12px;">
+              <div v-for="d in x.denominations" :key="d.key" style="display:flex; justify-content:space-between; font-size: 12px; color:#aab0bb; padding: 2px 0; font-variant-numeric: tabular-nums;">
+                <span>{{ peso2(d.value) }} {{ d.type }} × {{ d.count }}</span>
+                <span>{{ peso2(Math.round(d.value * 100) * d.count / 100) }}</span>
+              </div>
+              <div style="font-size: 11.5px; color:#7a8190; margin-top: 4px;">Bills {{ peso2(x.billsTotal) }} · Coins {{ peso2(x.coinsTotal) }}</div>
+              <div v-if="x.remarks" style="font-size: 12px; color:#aab0bb; margin-top: 4px;">Remarks: {{ x.remarks }}</div>
+              <div v-if="x.voidStatus === 'pending'" style="font-size: 12px; color:#f3c44b; margin-top: 4px;">Void requested by {{ x.voidRequestedBy }} — {{ x.voidReason }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Voided remittances -->
+      <div class="rs-card" style="padding: 0;">
+        <div style="padding: 12px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026; color: #e88;">Voided remittances</div>
+        <div v-if="!data.remittance.voided.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No voided remittances in this period.</div>
+        <div v-for="x in data.remittance.voided" :key="x.id" style="display:flex; gap: 10px; align-items:flex-start; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size: 13px; font-weight: 600;">{{ x.businessDate }} <span style="font-weight: 400; color:#7a8190; font-size: 11.5px;">· saved by {{ x.submittedBy }}</span></div>
+            <div v-if="x.voidReason" style="font-size: 11.5px; color: #7a8190;">Reason: {{ x.voidReason }}</div>
+            <div style="font-size: 11px; color: #5d6470;">Approved by {{ x.voidReviewedBy || "super admin" }} · {{ gymDateTime(x.voidReviewedAt) }}</div>
+          </div>
+          <span style="font-size: 12.5px; color: #e88; text-decoration: line-through; font-variant-numeric: tabular-nums;">{{ peso2(x.totalCash) }}</span>
+        </div>
+      </div>
+    </template>
+
     <!-- Registered members / member analytics view -->
     <template v-else-if="view === 'registered'">
       <!-- Filter bar -->
@@ -772,6 +926,7 @@ function kindLabel(kind) {
   }
   /* Period buttons wrap */
   .rs-period-bar { flex-wrap: wrap; }
+  .rs-remit-cards { grid-template-columns: repeat(2, 1fr) !important; }
   /* Member analytics table scroll */
   .rs-analytics-table { overflow-x: auto; }
   .rs-analytics-table > div { min-width: 600px; }

@@ -10,7 +10,8 @@ const { data: checkins, refresh: refreshCheckins } = await useFetch("/api/checki
 const { data: notifications, refresh: refreshNotifications } = await useFetch("/api/notifications");
 const { data: voidRequests } = await useFetch("/api/void-requests");
 const { data: receiptVoidRequests } = await useFetch("/api/receipt-void-requests");
-const totalVoidsPending = computed(() => (voidRequests.value?.length || 0) + (receiptVoidRequests.value?.length || 0));
+const { data: remittanceVoidRequests } = await useFetch("/api/remittance-void-requests");
+const totalVoidsPending = computed(() => (voidRequests.value?.length || 0) + (receiptVoidRequests.value?.length || 0) + (remittanceVoidRequests.value?.length || 0));
 
 const reportable = computed(() => (checkins.value || []).filter((c) => !c.duplicateVisit && !c.voided));
 const walkins = computed(() => reportable.value.filter((c) => c.type === "walkin").length);
@@ -45,9 +46,11 @@ async function resetDashboard() {
       <div style="flex: 1;">
         {{ totalVoidsPending }} void request{{ totalVoidsPending > 1 ? "s" : "" }} pending your approval
         <span v-if="voidRequests?.length"> ({{ voidRequests.length }} check-in<span v-if="voidRequests.length > 1">s</span>)</span>
-        <span v-if="receiptVoidRequests?.length"> ({{ receiptVoidRequests.length }} sale<span v-if="receiptVoidRequests.length > 1">s</span>)</span>.
+        <span v-if="receiptVoidRequests?.length"> ({{ receiptVoidRequests.length }} sale<span v-if="receiptVoidRequests.length > 1">s</span>)</span>
+        <span v-if="remittanceVoidRequests?.length"> ({{ remittanceVoidRequests.length }} remittance<span v-if="remittanceVoidRequests.length > 1">s</span>)</span>.
         <NuxtLink to="/checkin" v-if="voidRequests?.length" style="color: #e8a8e8; text-decoration: underline; margin-left:4px;">Check-in →</NuxtLink>
         <NuxtLink to="/reports" v-if="receiptVoidRequests?.length" style="color: #e8a8e8; text-decoration: underline; margin-left:4px;">Reports →</NuxtLink>
+        <NuxtLink to="/remittance" v-if="remittanceVoidRequests?.length" style="color: #e8a8e8; text-decoration: underline; margin-left:4px;">Remittance →</NuxtLink>
       </div>
     </div>
 

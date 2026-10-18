@@ -1,6 +1,8 @@
 import CheckIn from "../utils/models/CheckIn";
 import Receipt from "../utils/models/Receipt";
 import Settings from "../utils/models/Settings";
+import Remittance from "../utils/models/Remittance";
+import { PESO_DENOMINATIONS } from "../../utils/peso";
 import { connectDB } from "../utils/db";
 import { requireRole } from "../utils/auth";
 import { getTodayRange } from "../utils/helpers";
@@ -66,11 +68,20 @@ export default defineEventHandler(async (event) => {
   const period = ["daily", "weekly", "monthly", "alltime", "custom"].includes(String(query.period)) ? String(query.period) : "daily";
   const { start, end } = getRange(period, utcOffset, query.start as string | undefined, query.end as string | undefined);
 
-  const [checkins, receipts, voidedCheckins, voidedReceipts] = await Promise.all([
+  // Remittances are keyed by gym-local business date (YYYY-MM-DD), so compare as strings.
+  const startDay = dayKey(start, utcOffset);
+  const endDay = dayKey(end, utcOffset);
+
+  const [checkins, receipts, voidedCheckins, voidedReceipts, remittances] = await Promise.all([
     CheckIn.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
     Receipt.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
     CheckIn.find({ createdAt: { $gte: start, $lte: end }, voided: true }).lean(),
     Receipt.find({ createdAt: { $gte: start, $lte: end }, voided: true }).lean(),
+    Remittance.find({ businessDate: { $gte: startDay, $lte: endDay } })
+      .populate("voidRequestedBy", "name")
+      .populate("voidReviewedBy", "name")
+      .sort({ createdAt: -1 })
+      .lean(),
   ]);
 
   // --- Gym goers report ---
@@ -234,8 +245,73 @@ export default defineEventHandler(async (event) => {
       })),
   };
 
+  // --- Sales remittance (cash on hand counted by staff vs sales recorded in the system) ---
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const activeRemits = remittances.filter((r: any) => !r.voided);
+  const voidedRemits = remittances.filter((r: any) => r.voided);
+
+  const salesByDay: Record<string, number> = {};
+  for (const r of receipts) {
+    const key = dayKey(new Date(r.createdAt), utcOffset);
+    salesByDay[key] = (salesByDay[key] || 0) + r.total;
+  }
+  const remitByDay: Record<string, { remitted: number; count: number }> = {};
+  const denomTotals: Record<string, number> = {};
+  for (const r of activeRemits as any[]) {
+    if (!remitByDay[r.businessDate]) remitByDay[r.businessDate] = { remitted: 0, count: 0 };
+    remitByDay[r.businessDate].remitted += r.totalCash;
+    remitByDay[r.businessDate].count += 1;
+    for (const d of r.denominations || []) denomTotals[d.key] = (denomTotals[d.key] || 0) + d.count;
+  }
+  const allDays = Array.from(new Set([...Object.keys(salesByDay), ...Object.keys(remitByDay)])).sort().reverse();
+  const remitTotal = round2(activeRemits.reduce((s: number, r: any) => s + r.totalCash, 0));
+  const salesTotal = round2(receipts.reduce((s, r) => s + r.total, 0));
+
+  const serializeRemit = (r: any) => ({
+    id: String(r._id),
+    businessDate: r.businessDate,
+    totalCash: r.totalCash,
+    billsTotal: r.billsTotal || 0,
+    coinsTotal: r.coinsTotal || 0,
+    denominations: r.denominations || [],
+    remarks: r.remarks || "",
+    submittedBy: r.submittedByName || "Unknown",
+    datetime: r.createdAt,
+    voidStatus: r.voidStatus || "none",
+    voidReason: r.voidReason || null,
+    voidRequestedBy: r.voidRequestedBy?.name || null,
+    voidReviewedBy: r.voidReviewedBy?.name || null,
+    voidReviewedAt: r.voidReviewedAt || null,
+  });
+
+  const remittance = {
+    totalRemitted: remitTotal,
+    totalRecordedSales: salesTotal,
+    variance: round2(remitTotal - salesTotal),
+    count: activeRemits.length,
+    daysRemitted: Object.keys(remitByDay).length,
+    daysWithSalesNotRemitted: allDays.filter((d) => salesByDay[d] && !remitByDay[d]).length,
+    pendingVoids: activeRemits.filter((r: any) => r.voidStatus === "pending").length,
+    byDay: allDays.map((date) => {
+      const remitted = round2(remitByDay[date]?.remitted || 0);
+      const sales = round2(salesByDay[date] || 0);
+      return { date, remitted, sales, variance: round2(remitted - sales), count: remitByDay[date]?.count || 0 };
+    }),
+    denominations: PESO_DENOMINATIONS.map((d) => ({
+      key: d.key,
+      label: d.label,
+      type: d.type,
+      value: d.value,
+      count: denomTotals[d.key] || 0,
+      amount: round2((Math.round(d.value * 100) * (denomTotals[d.key] || 0)) / 100),
+    })),
+    records: activeRemits.map(serializeRemit),
+    voided: voidedRemits.map(serializeRemit),
+  };
+
   return {
     period,
+    remittance,
     range: { start, end },
     gymGoers,
     checkinList,

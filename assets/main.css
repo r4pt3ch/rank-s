@@ -125,4 +125,5 @@ html, body { overflow-x: hidden; }
   animation: rs-spin 0.7s linear infinite;
   flex-shrink: 0;
 }
-.rs-btn-primary:disabled { opacity: 0.75; cursor: wait; }
+.rs-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.rs-btn-primary[aria-busy="true"] { opacity: 0.8; cursor: wait; }
