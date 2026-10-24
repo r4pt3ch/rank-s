@@ -46,6 +46,30 @@ export function serializeEPayment(p: any) {
   };
 }
 
+export function serializeExpense(x: any) {
+  return {
+    id: String(x._id),
+    businessDate: x.businessDate,
+    category: x.category,
+    categoryLabel: x.categoryLabel,
+    amount: x.amount,
+    description: x.description || "",
+    paidTo: x.paidTo || "",
+    receiptNo: x.receiptNo || "",
+    paidFrom: x.paidFrom || "cash",
+    recordedBy: x.recordedByName || "Unknown",
+    createdAt: x.createdAt,
+    voided: !!x.voided,
+    voidStatus: x.voidStatus || "none",
+    voidReason: x.voidReason || null,
+    voidRequestedAt: x.voidRequestedAt || null,
+    voidRequestedBy: x.voidRequestedBy?.name || null,
+    voidReviewedAt: x.voidReviewedAt || null,
+    voidReviewedBy: x.voidReviewedBy?.name || null,
+    voidRejectionReason: x.voidRejectionReason || null,
+  };
+}
+
 export function serializeRemittance(r: any) {
   return {
     id: String(r._id),

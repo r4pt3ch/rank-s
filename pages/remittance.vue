@@ -6,11 +6,12 @@ const isSuper = computed(() => user.value?.role === "superadmin");
 const { data, refresh } = await useFetch("/api/remittances");
 const { data: pendingVoids, refresh: refreshPending } = await useFetch("/api/remittance-void-requests");
 const { data: epay, refresh: refreshEpay } = await useFetch("/api/epayments");
+const { data: exp, refresh: refreshExp } = await useFetch("/api/expenses");
 const route = useRoute();
-const entryTab = ref(route.query.tab === "epay" ? "epay" : "cash"); // 'cash' | 'epay'
+const entryTab = ref(["epay", "expense"].includes(route.query.tab) ? route.query.tab : "cash"); // 'cash' | 'epay' | 'expense'
 
 function refreshAll() {
-  return Promise.all([refresh(), refreshPending(), refreshEpay()]);
+  return Promise.all([refresh(), refreshPending(), refreshEpay(), refreshExp()]);
 }
 
 const bills = PESO_DENOMINATIONS.filter((d) => d.type === "bill");
@@ -57,7 +58,10 @@ const savedNotice = ref("");
 const confirmLines = computed(() =>
   PESO_DENOMINATIONS.filter((d) => count(d.key) > 0).map((d) => ({ ...d, count: count(d.key), amount: lineAmount(d) }))
 );
-const projectedCollected = computed(() => (data.value?.todayRemitted || 0) + (data.value?.todayEpayments || 0) + grandTotal.value);
+// What today's cash balance will look like once this count is saved.
+const projectedBalance = computed(() =>
+  cashBalance(data.value?.todaySales || 0, data.value?.todayEpayments || 0, data.value?.todayExpensesCash || 0, (data.value?.todayRemitted || 0) + grandTotal.value)
+);
 
 async function save() {
   if (saving.value) return;
@@ -160,9 +164,67 @@ function providerColor(key) {
   return epayProvider(key).color;
 }
 
-// ---- Today summary ----
-const todayCollected = computed(() => Math.round(((data.value?.todayRemitted || 0) + (data.value?.todayEpayments || 0)) * 100) / 100);
-const difference = computed(() => Math.round((todayCollected.value - (data.value?.todaySales || 0)) * 100) / 100);
+// ---- Expenses (each one logged and saved as money goes out) ----
+function emptyExpense() {
+  return { category: "", amount: "", description: "", paidTo: "", receiptNo: "", paidFrom: "cash" };
+}
+const xp = ref(emptyExpense());
+const xpConfirming = ref(false);
+const xpSaving = ref(false);
+const xpError = ref("");
+
+const xpCategory = computed(() => EXPENSE_CATEGORIES.find((c) => c.key === xp.value.category) || null);
+const xpAmount = computed(() => {
+  const n = Number(xp.value.amount);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+});
+const xpReady = computed(() => !!xpCategory.value && xpAmount.value > 0 && !!xp.value.description.trim());
+
+function sanitizeXpAmount() {
+  let v = String(xp.value.amount ?? "").replace(/[^\d.]/g, "");
+  const dot = v.indexOf(".");
+  if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, "").slice(0, 2);
+  xp.value.amount = v.replace(/^0+(?=\d)/, "").slice(0, 10);
+}
+function clearExpense() {
+  xp.value = emptyExpense();
+  xpConfirming.value = false;
+  xpError.value = "";
+}
+async function saveExpense() {
+  if (xpSaving.value) return;
+  xpSaving.value = true;
+  xpError.value = "";
+  try {
+    const saved = await $fetch("/api/expenses", { method: "POST", body: { ...xp.value, amount: xpAmount.value } });
+    clearExpense();
+    flash(`Expense of ${formatPeso(saved.amount)} (${saved.categoryLabel}) saved.`);
+    await refreshAll();
+  } catch (e) {
+    xpError.value = e.data?.statusMessage || "Could not save the expense. Please try again.";
+    xpConfirming.value = false;
+  } finally {
+    xpSaving.value = false;
+  }
+}
+
+const expenses = computed(() => exp.value?.expenses || []);
+const expenseTotal = computed(() =>
+  Math.round(expenses.value.filter((x) => !x.voided).reduce((s, x) => s + x.amount, 0) * 100) / 100
+);
+function categoryColor(key) {
+  return expenseCategory(key).color;
+}
+
+// ---- Today summary: cash on hand balance ----
+// expected cash = sales recorded − e-payments − expenses paid from the drawer
+const balance = computed(() =>
+  cashBalance(data.value?.todaySales || 0, data.value?.todayEpayments || 0, data.value?.todayExpensesCash || 0, data.value?.todayRemitted || 0)
+);
+const hasActivityToday = computed(() =>
+  !!(data.value?.todaySales || data.value?.todayRemitted || data.value?.todayEpayments || data.value?.todayExpensesCount)
+);
+const difference = computed(() => balance.value.difference);
 function diffLabel(n) {
   if (n === 0) return "Balanced";
   return n > 0 ? "Over" : "Short";
@@ -193,8 +255,7 @@ async function submitVoid() {
   voidBusy.value = true;
   voidError.value = "";
   try {
-    const base = voidFor.value.kind === "epayment" ? "/api/epayments" : "/api/remittances";
-    await $fetch(`${base}/${voidFor.value.id}/void-request`, { method: "POST", body: { reason: voidReason.value } });
+    await $fetch(`${voidBase(voidFor.value.kind)}/${voidFor.value.id}/void-request`, { method: "POST", body: { reason: voidReason.value } });
     voidFor.value = null;
     voidReason.value = "";
     await refreshAll();
@@ -216,8 +277,7 @@ async function review(action) {
   reviewBusy.value = true;
   reviewError.value = "";
   try {
-    const base = reviewFor.value.kind === "epayment" ? "/api/epayments" : "/api/remittances";
-    await $fetch(`${base}/${reviewFor.value.id}/void-review`, {
+    await $fetch(`${voidBase(reviewFor.value.kind)}/${reviewFor.value.id}/void-review`, {
       method: "POST",
       body: { action, rejectionReason: rejectionReason.value },
     });
@@ -236,11 +296,14 @@ function openVoid(item, kind) {
   voidReason.value = "";
   voidFor.value = { ...item, kind };
 }
+function voidBase(kind) {
+  return kind === "epayment" ? "/api/epayments" : kind === "expense" ? "/api/expenses" : "/api/remittances";
+}
 function voidTitle(v) {
   if (!v) return "";
-  return v.kind === "epayment"
-    ? `E-payment · ${formatPeso(v.amount)} via ${v.providerLabel}`
-    : `Cash remittance · ${prettyDate(v.businessDate)} · ${formatPeso(v.totalCash)}`;
+  if (v.kind === "epayment") return `E-payment · ${formatPeso(v.amount)} via ${v.providerLabel}`;
+  if (v.kind === "expense") return `Expense · ${formatPeso(v.amount)} · ${v.categoryLabel}`;
+  return `Cash remittance · ${prettyDate(v.businessDate)} · ${formatPeso(v.totalCash)}`;
 }
 
 function prettyDate(ymd) {
@@ -254,8 +317,8 @@ function prettyDate(ymd) {
   <div>
     <h1 style="font-size: 22px; font-weight: 800; margin: 0;">Sales remittance</h1>
     <p style="font-size: 13.5px; color: #8a909b; margin: 6px 0 22px;">
-      Count today's cash on hand by bill and coin, and log every GCash, Maya, GoTyme or other e-payment as it comes in.
-      Entries can be edited freely until saved — after that, they can only be voided with super admin approval.
+      Count today's cash on hand by bill and coin, log every GCash, Maya, GoTyme or other e-payment as it comes in,
+      and record every expense paid out during the day. Entries can be edited freely until saved — after that, they can only be voided with super admin approval.
     </p>
 
     <div v-if="savedNotice" style="background:#14261b;border:1px solid #24502f;color:#8ee0ab;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;">
@@ -271,6 +334,9 @@ function prettyDate(ymd) {
         </button>
         <button type="button" role="tab" :aria-selected="entryTab === 'epay'" :class="{ active: entryTab === 'epay' }" @click="entryTab = 'epay'">
           E-payments <span v-if="data?.todayEpaymentsCount" class="rem-tab-pill">{{ data.todayEpaymentsCount }} today</span>
+        </button>
+        <button type="button" role="tab" :aria-selected="entryTab === 'expense'" :class="{ active: entryTab === 'expense' }" @click="entryTab = 'expense'">
+          Expenses <span v-if="data?.todayExpensesCount" class="rem-tab-pill">{{ data.todayExpensesCount }} today</span>
         </button>
       </div>
       <div class="rs-card" v-show="entryTab === 'cash'" style="border-top-left-radius: 0;">
@@ -460,6 +526,133 @@ function prettyDate(ymd) {
           </div>
         </div>
       </div>
+
+      <!-- Expenses -->
+      <div v-show="entryTab === 'expense'" style="display:flex; flex-direction:column; gap: 18px;">
+        <div class="rs-card" style="border-top-left-radius: 0;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 4px;">
+            <div style="font-weight: 700; font-size: 15px;">Log an expense</div>
+            <div style="font-size: 12px; color: #5bb8f5; font-weight: 600;">{{ prettyDate(data?.today) }}</div>
+          </div>
+          <div style="font-size: 12px; color: #7a8190; margin-bottom: 14px;">Record money paid out as soon as it leaves. Expenses paid from the drawer are deducted from the cash you're expected to have on hand.</div>
+
+          <fieldset :disabled="xpConfirming || xpSaving" style="border: none; padding: 0; margin: 0;">
+            <legend style="font-size: 12px; color: #9aa1ab; margin-bottom: 8px; padding: 0;">What was it for?</legend>
+            <div style="display:flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
+              <button
+                v-for="c in EXPENSE_CATEGORIES" :key="c.key" type="button"
+                class="rem-chip" :class="{ active: xp.category === c.key }"
+                :style="xp.category === c.key ? { borderColor: c.color, color: '#e6e8eb', background: c.color + '22' } : {}"
+                :aria-pressed="xp.category === c.key" :title="c.hint"
+                @click="xp.category = c.key"
+              >
+                <span class="rem-dot" :style="{ background: c.color }"></span>{{ c.label }}
+              </button>
+            </div>
+            <div style="font-size: 11.5px; color:#5d6470; min-height: 16px; margin-bottom: 10px;">{{ xpCategory?.hint || "" }}</div>
+
+            <label style="font-size: 12px; color: #9aa1ab; display:block; margin-bottom: 6px;">Amount paid</label>
+            <div style="position: relative; margin-bottom: 12px;">
+              <span style="position:absolute; left: 14px; top: 50%; transform: translateY(-50%); color:#8a909b; font-weight: 700; font-size: 18px;">₱</span>
+              <input v-model="xp.amount" @input="sanitizeXpAmount" inputmode="decimal" class="rs-input" placeholder="0.00"
+                style="padding-left: 34px; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums;" aria-label="Amount paid in pesos" />
+            </div>
+
+            <label style="font-size: 12px; color: #9aa1ab; display:block; margin-bottom: 6px;">Description</label>
+            <input v-model="xp.description" class="rs-input" maxlength="200" placeholder="e.g. 2 gallons of drinking water, mop head" style="margin-bottom: 12px;" />
+
+            <div class="rem-grid-2" style="margin-bottom: 12px;">
+              <div>
+                <label style="font-size: 12px; color: #9aa1ab; display:block; margin-bottom: 6px;">Paid to (optional)</label>
+                <input v-model="xp.paidTo" class="rs-input" maxlength="80" placeholder="Store, supplier or person" />
+              </div>
+              <div>
+                <label style="font-size: 12px; color: #9aa1ab; display:block; margin-bottom: 6px;">Receipt / OR no. (optional)</label>
+                <input v-model="xp.receiptNo" class="rs-input" maxlength="60" placeholder="From the receipt" />
+              </div>
+            </div>
+
+            <div style="font-size: 12px; color: #9aa1ab; margin-bottom: 6px;">Paid from</div>
+            <div class="rem-seg" role="radiogroup" aria-label="Paid from" style="margin-bottom: 14px;">
+              <button v-for="src in EXPENSE_SOURCES" :key="src.key" type="button" role="radio"
+                :aria-checked="xp.paidFrom === src.key" :class="{ active: xp.paidFrom === src.key }" @click="xp.paidFrom = src.key">
+                <span style="font-weight: 700; font-size: 12.5px;">{{ src.label }}</span>
+                <span style="font-size: 11px; color:#7a8190;">{{ src.hint }}</span>
+              </button>
+            </div>
+          </fieldset>
+
+          <div v-if="xpError" style="color:#e36b6b; font-size: 12.5px; margin-bottom: 10px;">{{ xpError }}</div>
+
+          <div v-if="xpConfirming" style="background:#0f1216; border: 1px solid #2f8fd6; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px;">
+              <div style="display:flex; align-items:center; gap: 8px; min-width: 0;">
+                <span class="rem-dot" :style="{ background: xpCategory?.color }"></span>
+                <span style="font-weight: 700;">{{ xpCategory?.label }}</span>
+              </div>
+              <span style="font-weight: 800; font-size: 20px; color:#e88; font-variant-numeric: tabular-nums;">−{{ formatPeso(xpAmount) }}</span>
+            </div>
+            <div style="font-size: 12px; color:#aab0bb; margin-top: 6px; line-height: 1.6;">
+              {{ xp.description }}<span v-if="xp.paidTo"> · paid to {{ xp.paidTo }}</span><span v-if="xp.receiptNo"> · OR {{ xp.receiptNo }}</span>
+            </div>
+            <div style="font-size: 12px; margin-top: 4px;" :style="{ color: xp.paidFrom === 'cash' ? '#f3c44b' : '#aab0bb' }">
+              {{ xp.paidFrom === "cash"
+                ? `From cash on hand — expected cash drops to ${formatPeso(balance.expectedCash - xpAmount)}.`
+                : "Not from the drawer — doesn't change expected cash on hand." }}
+            </div>
+            <div style="font-size: 11.5px; color:#f3d8a8; margin-top: 8px;">Once saved, it can't be edited — only voided with super admin approval.</div>
+          </div>
+
+          <div style="display:flex; gap: 8px;">
+            <template v-if="!xpConfirming">
+              <button type="button" class="rs-btn-secondary" :disabled="!xp.category && !xp.amount && !xp.description" @click="clearExpense">Clear</button>
+              <button type="button" class="rs-btn-primary" style="flex: 1; justify-content:center;" :disabled="!xpReady" @click="xpError = ''; xpConfirming = true">Review &amp; save</button>
+            </template>
+            <template v-else>
+              <button type="button" class="rs-btn-secondary" style="flex: 1; justify-content:center;" :disabled="xpSaving" @click="xpConfirming = false">Edit</button>
+              <button type="button" class="rs-btn-primary" style="flex: 1; justify-content:center;" :disabled="xpSaving" :aria-busy="xpSaving" @click="saveExpense">
+                <span v-if="xpSaving" class="rs-spinner" aria-hidden="true"></span>
+                {{ xpSaving ? "Saving..." : "Save expense" }}
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Today's expenses -->
+        <div class="rs-card" style="padding: 0;">
+          <div style="padding: 14px 18px; border-bottom: 1px solid #1c2026;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight: 700; font-size: 14px;">Today's expenses</span>
+              <span style="font-weight: 800; font-variant-numeric: tabular-nums;">{{ formatPeso(expenseTotal) }}</span>
+            </div>
+            <div v-if="data?.todayExpensesCount" style="font-size: 11.5px; color:#7a8190; margin-top: 6px;">
+              From cash on hand {{ formatPeso(data.todayExpensesCash) }}<span v-if="data.todayExpensesOther"> · not from drawer {{ formatPeso(data.todayExpensesOther) }}</span>
+            </div>
+          </div>
+          <div v-if="!expenses.length" style="padding: 24px; text-align:center; color:#5d6470; font-size:13px;">No expenses logged today.</div>
+          <div v-for="x in expenses" :key="x.id" style="display:flex; gap: 10px; align-items:flex-start; padding: 11px 18px; border-bottom: 1px solid #1c2026;">
+            <span class="rem-dot" :style="{ background: categoryColor(x.category), marginTop: '6px' }"></span>
+            <div style="flex:1; min-width:0;">
+              <div style="font-size: 13px; font-weight: 600; word-break: break-word;">
+                {{ x.description }}
+                <span style="font-weight: 400; color:#aab0bb;">· {{ x.categoryLabel }}</span>
+              </div>
+              <div style="font-size: 11.5px; color:#7a8190; word-break: break-word;">
+                <span v-if="x.paidTo">{{ x.paidTo }} · </span><span v-if="x.receiptNo">OR {{ x.receiptNo }} · </span>
+                {{ gymDateTime(x.createdAt) }} · {{ x.recordedBy }}
+              </div>
+              <div style="font-size: 11px;" :style="{ color: x.paidFrom === 'cash' ? '#aab0bb' : '#5d6470' }">{{ x.paidFrom === "cash" ? "From cash on hand" : "Not from drawer" }}</div>
+              <div v-if="x.voidReason" style="font-size: 11.5px; color:#aab0bb;">Void reason: {{ x.voidReason }}</div>
+              <div v-if="x.voidStatus === 'rejected'" style="font-size: 11.5px; color:#7a8190;">Void rejected<span v-if="x.voidRejectionReason"> — {{ x.voidRejectionReason }}</span></div>
+            </div>
+            <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
+              <span style="font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums;" :style="{ textDecoration: x.voided ? 'line-through' : 'none', color: x.voided ? '#7a8190' : '#e6e8eb' }">{{ formatPeso(x.amount) }}</span>
+              <span v-if="x.voided || x.voidStatus === 'pending'" style="font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;" :style="{ color: statusBadge(x).color, background: statusBadge(x).bg }">{{ statusBadge(x).text }}</span>
+              <button v-else type="button" class="rem-link-danger" @click="openVoid(x, 'expense')">Request void</button>
+            </div>
+          </div>
+        </div>
+      </div>
       </div>
 
       <!-- ============ Right column ============ -->
@@ -469,30 +662,42 @@ function prettyDate(ymd) {
           <div style="font-weight: 700; font-size: 14px; margin-bottom: 14px;">Today at a glance</div>
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="rem-stat">
-              <div class="rem-stat-label">Cash remitted</div>
-              <div class="rem-stat-value">{{ formatPeso(data?.todayRemitted) }}</div>
+              <div class="rem-stat-label">Sales recorded in system</div>
+              <div class="rem-stat-value">{{ formatPeso(data?.todaySales) }}</div>
+              <div class="rem-stat-sub">{{ data?.todaySalesCount || 0 }} transactions</div>
             </div>
             <div class="rem-stat">
               <div class="rem-stat-label">E-payments</div>
               <div class="rem-stat-value">{{ formatPeso(data?.todayEpayments) }}</div>
               <div class="rem-stat-sub">{{ data?.todayEpaymentsCount || 0 }} payment{{ data?.todayEpaymentsCount === 1 ? "" : "s" }}</div>
             </div>
-            <div class="rem-stat" style="border-color:#2f8fd6;">
-              <div class="rem-stat-label" style="color:#5bb8f5;">Total collected</div>
-              <div class="rem-stat-value" style="color:#5bb8f5;">{{ formatPeso(todayCollected) }}</div>
-              <div class="rem-stat-sub">cash + e-payments</div>
-            </div>
             <div class="rem-stat">
-              <div class="rem-stat-label">Sales recorded in system</div>
-              <div class="rem-stat-value">{{ formatPeso(data?.todaySales) }}</div>
-              <div class="rem-stat-sub">{{ data?.todaySalesCount || 0 }} transactions</div>
+              <div class="rem-stat-label">Expenses</div>
+              <div class="rem-stat-value">{{ formatPeso((data?.todayExpensesCash || 0) + (data?.todayExpensesOther || 0)) }}</div>
+              <div class="rem-stat-sub">{{ data?.todayExpensesCount || 0 }} expense{{ data?.todayExpensesCount === 1 ? "" : "s" }}<span v-if="data?.todayExpensesOther"> · {{ formatPeso(data.todayExpensesOther) }} not from drawer</span></div>
+            </div>
+            <div class="rem-stat" style="border-color:#2f8fd6;">
+              <div class="rem-stat-label" style="color:#5bb8f5;">Cash counted</div>
+              <div class="rem-stat-value" style="color:#5bb8f5;">{{ formatPeso(data?.todayRemitted) }}</div>
+              <div class="rem-stat-sub">saved cash counts</div>
             </div>
           </div>
-          <div v-if="todayCollected" style="display:flex; justify-content:space-between; align-items:center; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background:#0f1216; border:1px solid #1f242c;">
-            <span style="font-size: 12.5px; color: #aab0bb;">Difference <span style="color:#5d6470;">(collected − recorded sales)</span></span>
-            <span style="font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums;" :style="{ color: diffColor(difference) }">
-              {{ diffLabel(difference) }} {{ difference !== 0 ? formatPeso(Math.abs(difference)) : "" }}
-            </span>
+
+          <!-- Cash on hand balance -->
+          <div style="margin-top: 14px; background:#0f1216; border:1px solid #1f242c; border-radius: 10px; padding: 12px 14px; font-variant-numeric: tabular-nums;">
+            <div style="font-size: 11px; color: #8a909b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 8px;">Cash on hand balance</div>
+            <div class="rem-bal-row"><span>Sales recorded</span><span>{{ formatPeso(data?.todaySales) }}</span></div>
+            <div class="rem-bal-row"><span>Less e-payments received</span><span>−{{ formatPeso(data?.todayEpayments) }}</span></div>
+            <div class="rem-bal-row"><span>Less expenses paid from cash</span><span>−{{ formatPeso(data?.todayExpensesCash) }}</span></div>
+            <div class="rem-bal-row rem-bal-total"><span>Expected cash on hand</span><span>{{ formatPeso(balance.expectedCash) }}</span></div>
+            <div class="rem-bal-row"><span>Cash counted</span><span>{{ formatPeso(data?.todayRemitted) }}</span></div>
+            <div v-if="hasActivityToday" class="rem-bal-row rem-bal-total" style="margin-bottom: 0;">
+              <span>Difference</span>
+              <span :style="{ color: data?.todayRemitted ? diffColor(difference) : '#7a8190' }">
+                <template v-if="data?.todayRemitted">{{ diffLabel(difference) }} {{ difference !== 0 ? formatPeso(Math.abs(difference)) : "" }}</template>
+                <template v-else>Not counted yet</template>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -506,6 +711,7 @@ function prettyDate(ymd) {
             <div style="flex:1; min-width:0;">
               <div style="font-size: 13px; font-weight: 600;">{{ voidTitle(p) }}</div>
               <div v-if="p.kind === 'epayment'" style="font-size: 11.5px; color: #7a8190;">{{ prettyDate(p.businessDate) }}<span v-if="p.referenceNo"> · Ref {{ p.referenceNo }}</span><span v-if="p.payerName"> · {{ p.payerName }}</span></div>
+              <div v-else-if="p.kind === 'expense'" style="font-size: 11.5px; color: #7a8190;">{{ prettyDate(p.businessDate) }} · {{ p.description }}</div>
               <div style="font-size: 11.5px; color: #aab0bb;">Reason: {{ p.voidReason }}</div>
               <div style="font-size: 11px; color: #5d6470;">Requested by {{ p.voidRequestedBy || "Unknown" }} · {{ gymDateTime(p.voidRequestedAt) }}</div>
             </div>
@@ -593,7 +799,10 @@ function prettyDate(ymd) {
         <div v-if="remarks" style="font-size: 12.5px; color:#aab0bb; margin-bottom: 12px;">Remarks: {{ remarks }}</div>
 
         <div style="font-size: 12px; color:#7a8190; margin-bottom: 12px;">
-          Today's total collected (cash + e-payments) will be {{ formatPeso(projectedCollected) }} against {{ formatPeso(data?.todaySales) }} recorded sales.
+          Expected cash on hand today is {{ formatPeso(projectedBalance.expectedCash) }}
+          (sales {{ formatPeso(data?.todaySales) }} − e-payments {{ formatPeso(data?.todayEpayments) }} − cash expenses {{ formatPeso(data?.todayExpensesCash) }}).
+          With this count, today will be
+          <b :style="{ color: diffColor(projectedBalance.difference) }">{{ diffLabel(projectedBalance.difference) }}{{ projectedBalance.difference !== 0 ? " " + formatPeso(Math.abs(projectedBalance.difference)) : "" }}</b>.
         </div>
         <div style="background:#2a2414; border:1px solid #5a4f24; color:#f3d8a8; border-radius: 8px; padding: 10px 12px; font-size: 12.5px; margin-bottom: 14px;">
           Once saved, this can't be edited. Mistakes need a void request approved by the super admin.
@@ -621,6 +830,9 @@ function prettyDate(ymd) {
           <div style="font-weight: 600; margin-bottom: 4px;">{{ voidTitle(voidFor) }}</div>
           <div v-if="voidFor.kind === 'epayment'" style="color:#aab0bb; font-size: 12px;">
             <span v-if="voidFor.referenceNo">Ref {{ voidFor.referenceNo }} · </span><span v-if="voidFor.payerName">{{ voidFor.payerName }} · </span>logged by {{ voidFor.recordedBy }}
+          </div>
+          <div v-else-if="voidFor.kind === 'expense'" style="color:#aab0bb; font-size: 12px;">
+            {{ voidFor.description }}<span v-if="voidFor.paidTo"> · {{ voidFor.paidTo }}</span> · logged by {{ voidFor.recordedBy }}
           </div>
           <div v-else style="color:#aab0bb; font-size: 12px;">Saved by {{ voidFor.submittedBy }}</div>
         </div>
@@ -653,11 +865,17 @@ function prettyDate(ymd) {
             <div v-if="reviewFor.notes">{{ reviewFor.notes }}</div>
             <div>Logged by {{ reviewFor.recordedBy }} · {{ gymDateTime(reviewFor.createdAt) }}</div>
           </div>
+          <div v-else-if="reviewFor.kind === 'expense'" style="color:#aab0bb; font-size: 12px; line-height: 1.6;">
+            <div>{{ reviewFor.description }}</div>
+            <div v-if="reviewFor.paidTo || reviewFor.receiptNo"><span v-if="reviewFor.paidTo">Paid to {{ reviewFor.paidTo }}</span><span v-if="reviewFor.receiptNo"> · OR {{ reviewFor.receiptNo }}</span></div>
+            <div>{{ reviewFor.paidFrom === "cash" ? "From cash on hand" : "Not from drawer" }}</div>
+            <div>Logged by {{ reviewFor.recordedBy }} · {{ gymDateTime(reviewFor.createdAt) }}</div>
+          </div>
           <div v-else style="color:#aab0bb; font-size: 12px;">Saved by {{ reviewFor.submittedBy }} · {{ gymDateTime(reviewFor.createdAt) }}</div>
           <div style="color:#aab0bb; font-size: 12px; margin-top: 6px;">Reason: {{ reviewFor.voidReason }}</div>
           <div style="color:#7a8190; font-size: 11.5px;">Requested by {{ reviewFor.voidRequestedBy }}</div>
         </div>
-        <div v-if="reviewFor.kind !== 'epayment'" style="background:#0f1216; border:1px solid #1f242c; border-radius: 10px; padding: 8px 12px; margin-bottom: 12px;">
+        <div v-if="reviewFor.kind === 'remittance'" style="background:#0f1216; border:1px solid #1f242c; border-radius: 10px; padding: 8px 12px; margin-bottom: 12px;">
           <div v-for="d in reviewFor.denominations" :key="d.key" style="display:flex; justify-content:space-between; font-size: 12px; color:#aab0bb; padding: 2px 0; font-variant-numeric: tabular-nums;">
             <span>{{ formatPeso(d.value) }} {{ d.type }} × {{ d.count }}</span>
             <span>{{ formatPeso(Math.round(d.value * 100) * d.count / 100) }}</span>
@@ -724,6 +942,24 @@ function prettyDate(ymd) {
 .rem-chip:disabled { cursor: default; opacity: 0.7; }
 .rem-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .rem-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rem-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.rem-seg button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  background: #0f1216;
+  color: #aab0bb;
+  border: 1px solid #2a2f38;
+  border-radius: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+.rem-seg button.active { border-color: #2f8fd6; color: #e6e8eb; background: #2f8fd61a; }
+.rem-seg button:disabled { cursor: default; opacity: 0.7; }
+.rem-bal-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; color: #aab0bb; padding: 3px 0; }
+.rem-bal-total { border-top: 1px solid #1f242c; margin: 4px 0; padding-top: 7px; color: #e6e8eb; font-weight: 700; }
 .rem-stat { background: #0f1216; border: 1px solid #1f242c; border-radius: 10px; padding: 12px; }
 .rem-stat-label { font-size: 11px; color: #8a909b; margin-bottom: 6px; }
 .rem-stat-value { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -732,6 +968,7 @@ function prettyDate(ymd) {
 .rem-link-danger:hover { text-decoration: underline; }
 @media (max-width: 768px) {
   .rem-grid-2 { grid-template-columns: 1fr; }
+  .rem-seg { grid-template-columns: 1fr; }
 }
 .rem-overlay {
   position: fixed;

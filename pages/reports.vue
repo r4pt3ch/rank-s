@@ -1,7 +1,7 @@
 <script setup>
 const { gymDateTime, gymDate, gymTime, offset } = useGymTime();
 const route = useRoute();
-const view = ref(route.query.view ? String(route.query.view) : "goers"); // 'goers' | 'checkin' | 'inventory' | 'membership' | 'registered' | 'remittance'
+const view = ref(route.query.view ? String(route.query.view) : "goers"); // 'goers' | 'checkin' | 'inventory' | 'membership' | 'registered' | 'remittance' | 'expenses'
 const period = ref("daily");
 const customStart = ref("");
 const customEnd = ref("");
@@ -65,6 +65,7 @@ const views = [
   { id: "membership", label: "Membership sales" },
   { id: "registered", label: "Registered members" },
   { id: "remittance", label: "Sales remittance" },
+  { id: "expenses",   label: "Expenses" },
   { id: "voided",     label: "Voided" },
 ];
 const periods = [
@@ -273,14 +274,15 @@ function exportRemittance() {
     ["E-payments", r.totalEpayments],
     ["Total collected (cash + e-payments)", r.totalCollected],
     ["Sales recorded in system", r.totalRecordedSales],
-    ["Difference (collected - sales)", r.variance],
+    ["Expenses paid from cash", r.totalExpensesCash || 0],
+    ["Difference (collected + cash expenses - sales)", r.variance],
     ["Cash remittances saved", r.count],
     ["E-payments logged", r.epaymentCount],
     ["Days with sales but nothing collected", r.daysWithSalesNotRemitted],
     [],
     ["--- By day ---"],
-    ["Date", "Cash remittances", "Cash remitted", "E-payments (count)", "E-payments", "Total collected", "Recorded sales", "Difference", "Status"],
-    ...r.byDay.map((d) => [d.date, d.count, d.remitted, d.epayCount, d.epay, d.collected, d.sales, d.variance, remitStatus(d).text]),
+    ["Date", "Cash remittances", "Cash remitted", "E-payments (count)", "E-payments", "Total collected", "Cash expenses", "Recorded sales", "Difference", "Status"],
+    ...r.byDay.map((d) => [d.date, d.count, d.remitted, d.epayCount, d.epay, d.collected, d.expenses || 0, d.sales, d.variance, remitStatus(d).text]),
     [],
     ["--- E-payments by channel ---"],
     ["Channel", "Payments", "Amount"],
@@ -316,6 +318,68 @@ function exportRemittance() {
   downloadCSV(`rank-s-sales-remittance-${periodSlug()}.csv`, rows);
 }
 
+function exportExpenses() {
+  if (!data.value?.expenses) return;
+  const x = data.value.expenses;
+  const b = x.balance;
+  const status = (v) => (v.voidStatus === "pending" ? "Void pending" : v.voidStatus === "rejected" ? "Void rejected" : "");
+  const rows = [
+    ["Rank S — Expenses & Cash on Hand", period.value, rangeLabel.value],
+    [],
+    ["Total expenses", x.total],
+    ["Paid from cash on hand", x.totalCash],
+    ["Paid outside the drawer", x.totalOther],
+    ["Expenses logged", x.count],
+    [],
+    ["--- Cash on hand balance ---"],
+    ["Sales recorded in system", b.sales],
+    ["Less e-payments received", b.epayments],
+    ["Cash sales", b.cashSales],
+    ["Less expenses paid from cash", b.expensesCash],
+    ["Expected cash on hand", b.expectedCash],
+    ["Cash counted (remitted)", b.counted],
+    ["Difference (counted - expected)", b.difference],
+    ["Status", b.counted || !b.expectedCash ? diffText(b.difference) : "Not counted"],
+    ["Days with activity but no cash count", b.daysNotCounted],
+    [],
+    ["--- By day ---"],
+    ["Date", "Recorded sales", "E-payments", "Cash sales", "Expenses (cash)", "Expenses (not from drawer)", "Expected cash", "Cash counted", "Difference", "Status"],
+    ...x.byDay.map((d) => [d.date, d.sales, d.epay, d.cashSales, d.expensesCash, d.expensesOther, d.expectedCash, d.counted, d.difference, balanceStatus(d).text]),
+    [],
+    ["--- By category ---"],
+    ["Category", "Expenses", "Amount"],
+    ...x.byCategory.map((c) => [c.label, c.count, c.amount]),
+    [],
+    ["--- Expense records ---"],
+    ["Business date", "Logged at", "Logged by", "Category", "Description", "Amount", "Paid from", "Paid to", "Receipt / OR no.", "Void status"],
+    ...x.records.map((v) => [
+      v.businessDate, gymDateTime(v.datetime, { year: "numeric" }), v.recordedBy, v.categoryLabel, v.description, v.amount,
+      v.paidFrom === "cash" ? "Cash on hand" : "Not from drawer", v.paidTo, v.receiptNo, status(v),
+    ]),
+    [],
+    ["--- Voided expenses ---"],
+    ["Business date", "Category", "Description", "Amount", "Void reason", "Approved by", "Voided at"],
+    ...x.voided.map((v) => [v.businessDate, v.categoryLabel, v.description, v.amount, v.voidReason || "", v.voidReviewedBy || "", gymDateTime(v.voidReviewedAt, { year: "numeric" })]),
+  ];
+  downloadCSV(`rank-s-expenses-${periodSlug()}.csv`, rows);
+}
+function diffText(n) {
+  return n === 0 ? "Balanced" : n > 0 ? "Over" : "Short";
+}
+function diffColor(n) {
+  return n === 0 ? "#8ee0ab" : n > 0 ? "#f3c44b" : "#e88";
+}
+function signedPeso(n) {
+  return (n > 0 ? "+" : n < 0 ? "−" : "") + peso2(Math.abs(n));
+}
+function balanceStatus(d) {
+  if (!d.counts && (d.sales > 0 || d.expensesCash > 0)) return { text: "Not counted", color: "#e88" };
+  return { text: diffText(d.difference), color: diffColor(d.difference) };
+}
+function categoryColor(key) {
+  return expenseCategory(key).color;
+}
+
 function peso2(n) {
   return "₱" + Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -337,6 +401,7 @@ function exportCurrent() {
   else if (view.value === "registered") exportRegistered();
   else if (view.value === "voided") exportVoided();
   else if (view.value === "remittance") exportRemittance();
+  else if (view.value === "expenses") exportExpenses();
   else exportMembership();
 }
 
@@ -720,7 +785,7 @@ function kindLabel(kind) {
           <div style="font-size: 22px; font-weight: 800;" :style="{ color: data.remittance.variance === 0 ? '#8ee0ab' : data.remittance.variance > 0 ? '#f3c44b' : '#e88' }">
             {{ data.remittance.variance > 0 ? "+" : data.remittance.variance < 0 ? "−" : "" }}{{ peso2(Math.abs(data.remittance.variance)) }}
           </div>
-          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">{{ data.remittance.variance === 0 ? "balanced" : data.remittance.variance > 0 ? "over" : "short" }} · collected − sales</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">{{ data.remittance.variance === 0 ? "balanced" : data.remittance.variance > 0 ? "over" : "short" }} · after {{ peso2(data.remittance.totalExpensesCash) }} cash expenses</div>
         </div>
         <div class="rs-card" style="padding: 16px;" :style="{ borderColor: data.remittance.daysWithSalesNotRemitted ? '#5a2424' : '' }">
           <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Days not remitted</div>
@@ -734,15 +799,16 @@ function kindLabel(kind) {
         <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">By day</div>
         <div v-if="!data.remittance.byDay.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No sales or remittances in this period.</div>
         <div v-else class="rs-table-scroll">
-          <div style="min-width: 720px;">
-            <div style="display:grid; grid-template-columns: 1.1fr 1fr 1fr 1fr 1fr 1fr 0.9fr; gap: 8px; padding: 10px 18px; font-size: 11px; color: #5d6470; border-bottom: 1px solid #1c2026;">
-              <span>Date</span><span style="text-align:right;">Cash</span><span style="text-align:right;">E-payments</span><span style="text-align:right;">Collected</span><span style="text-align:right;">Recorded sales</span><span style="text-align:right;">Difference</span><span style="text-align:right;">Status</span>
+          <div style="min-width: 820px;">
+            <div style="display:grid; grid-template-columns: 1.1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.9fr; gap: 8px; padding: 10px 18px; font-size: 11px; color: #5d6470; border-bottom: 1px solid #1c2026;">
+              <span>Date</span><span style="text-align:right;">Cash</span><span style="text-align:right;">E-payments</span><span style="text-align:right;">Collected</span><span style="text-align:right;">Cash expenses</span><span style="text-align:right;">Recorded sales</span><span style="text-align:right;">Difference</span><span style="text-align:right;">Status</span>
             </div>
-            <div v-for="d in data.remittance.byDay" :key="d.date" style="display:grid; grid-template-columns: 1.1fr 1fr 1fr 1fr 1fr 1fr 0.9fr; gap: 8px; padding: 10px 18px; border-bottom: 1px solid #1c2026; font-size: 12.5px; font-variant-numeric: tabular-nums;">
+            <div v-for="d in data.remittance.byDay" :key="d.date" style="display:grid; grid-template-columns: 1.1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.9fr; gap: 8px; padding: 10px 18px; border-bottom: 1px solid #1c2026; font-size: 12.5px; font-variant-numeric: tabular-nums;">
               <span style="font-weight: 600;">{{ d.date }}</span>
               <span style="text-align:right;">{{ peso2(d.remitted) }}</span>
               <span style="text-align:right;">{{ peso2(d.epay) }}<span v-if="d.epayCount" style="color:#5d6470; font-size: 11px;"> ({{ d.epayCount }})</span></span>
               <span style="text-align:right; font-weight: 700;">{{ peso2(d.collected) }}</span>
+              <span style="text-align:right; color:#aab0bb;">{{ d.expenses ? peso2(d.expenses) : "—" }}</span>
               <span style="text-align:right; color:#aab0bb;">{{ peso2(d.sales) }}</span>
               <span style="text-align:right;" :style="{ color: remitStatus(d).color }">{{ d.variance > 0 ? "+" : d.variance < 0 ? "−" : "" }}{{ peso2(Math.abs(d.variance)) }}</span>
               <span style="text-align:right; font-weight:600; font-size: 11.5px;" :style="{ color: remitStatus(d).color }">{{ remitStatus(d).text }}</span>
@@ -853,6 +919,140 @@ function kindLabel(kind) {
             <div style="font-size: 11px; color: #5d6470;">Approved by {{ x.voidReviewedBy || "super admin" }} · {{ gymDateTime(x.voidReviewedAt) }}</div>
           </div>
           <span style="font-size: 12.5px; color: #e88; text-decoration: line-through; font-variant-numeric: tabular-nums;">{{ peso2(x.totalCash) }}</span>
+        </div>
+      </div>
+    </template>
+
+    <!-- Expenses & cash on hand view -->
+    <template v-else-if="data && !pending && view === 'expenses' && data.expenses">
+      <p style="font-size: 12.5px; color: #5d6470; margin: -8px 0 16px;">
+        Money paid out during the day, and how it balances against the cash counted. Only expenses paid from the drawer reduce expected cash on hand. Voided expenses are listed separately and excluded from totals.
+        <NuxtLink to="/remittance?tab=expense" style="color:#5bb8f5; text-decoration:none; margin-left: 4px;">Log an expense →</NuxtLink>
+      </p>
+
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px;" class="rs-remit-cards">
+        <div class="rs-card" style="padding: 16px;">
+          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Total expenses</div>
+          <div style="font-size: 22px; font-weight: 800;">{{ peso2(data.expenses.total) }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">{{ data.expenses.count }} expense{{ data.expenses.count === 1 ? "" : "s" }}</div>
+        </div>
+        <div class="rs-card" style="padding: 16px;">
+          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Paid from cash on hand</div>
+          <div style="font-size: 22px; font-weight: 800;">{{ peso2(data.expenses.totalCash) }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">deducted from expected cash</div>
+        </div>
+        <div class="rs-card" style="padding: 16px;">
+          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Not from drawer</div>
+          <div style="font-size: 22px; font-weight: 800;">{{ peso2(data.expenses.totalOther) }}</div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">owner, bank or e-wallet</div>
+        </div>
+        <div class="rs-card" style="padding: 16px;" :style="{ borderColor: data.expenses.balance.counted ? '' : '#5a2424' }">
+          <div style="font-size: 12px; color: #8a909b; margin-bottom: 10px;">Cash on hand</div>
+          <div style="font-size: 22px; font-weight: 800;" :style="{ color: data.expenses.balance.counted ? diffColor(data.expenses.balance.difference) : '#7a8190' }">
+            {{ data.expenses.balance.counted ? signedPeso(data.expenses.balance.difference) : "—" }}
+          </div>
+          <div style="font-size: 11px; color: #5d6470; margin-top: 4px;">{{ data.expenses.balance.counted ? diffText(data.expenses.balance.difference).toLowerCase() + " vs expected" : "no cash counted" }}</div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 18px; margin-bottom: 18px;" class="rs-mobile-stack">
+        <!-- Balance waterfall -->
+        <div class="rs-card">
+          <div style="font-weight: 700; font-size: 13.5px; margin-bottom: 12px;">Cash on hand balance</div>
+          <div style="font-variant-numeric: tabular-nums; font-size: 13px;">
+            <div class="rs-bal-row"><span>Sales recorded in system</span><span>{{ peso2(data.expenses.balance.sales) }}</span></div>
+            <div class="rs-bal-row"><span>Less e-payments received</span><span>−{{ peso2(data.expenses.balance.epayments) }}</span></div>
+            <div class="rs-bal-row rs-bal-sub"><span>Cash sales</span><span>{{ peso2(data.expenses.balance.cashSales) }}</span></div>
+            <div class="rs-bal-row"><span>Less expenses paid from cash</span><span style="color:#e88;">−{{ peso2(data.expenses.balance.expensesCash) }}</span></div>
+            <div class="rs-bal-row rs-bal-sub"><span>Expected cash on hand</span><span>{{ peso2(data.expenses.balance.expectedCash) }}</span></div>
+            <div class="rs-bal-row"><span>Cash counted</span><span style="color:#5bb8f5;">{{ peso2(data.expenses.balance.counted) }}</span></div>
+            <div class="rs-bal-row rs-bal-sub" style="font-size: 14px;">
+              <span>Difference</span>
+              <span :style="{ color: diffColor(data.expenses.balance.difference) }">{{ diffText(data.expenses.balance.difference) }} {{ data.expenses.balance.difference !== 0 ? peso2(Math.abs(data.expenses.balance.difference)) : "" }}</span>
+            </div>
+          </div>
+          <div v-if="data.expenses.balance.daysNotCounted" style="margin-top: 12px; background:#2a1414; border:1px solid #5a2424; color:#f3a8a8; border-radius: 8px; padding: 9px 12px; font-size: 12px;">
+            {{ data.expenses.balance.daysNotCounted }} day{{ data.expenses.balance.daysNotCounted === 1 ? "" : "s" }} had sales or cash expenses but no cash count, so the period total will read short.
+          </div>
+        </div>
+
+        <!-- By category -->
+        <div class="rs-card" style="padding: 0;">
+          <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">By category</div>
+          <div v-if="!data.expenses.byCategory.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No expenses in this period.</div>
+          <div v-for="c in data.expenses.byCategory" :key="c.key" style="padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size: 12.5px; font-variant-numeric: tabular-nums;">
+              <span style="display:flex; align-items:center; gap: 8px; font-weight: 600;">
+                <span :style="{ width: '8px', height: '8px', borderRadius: '50%', background: categoryColor(c.key), display: 'inline-block' }"></span>{{ c.label }}
+              </span>
+              <span>{{ peso2(c.amount) }}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap: 8px; margin-top: 6px;">
+              <div style="flex:1; height: 4px; background:#1c2026; border-radius: 2px; overflow:hidden;">
+                <div :style="{ width: (data.expenses.total ? (c.amount / data.expenses.total) * 100 : 0) + '%', height: '100%', background: categoryColor(c.key) }"></div>
+              </div>
+              <span style="font-size: 11px; color:#7a8190; min-width: 70px; text-align:right;">{{ c.count }} expense{{ c.count === 1 ? "" : "s" }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- By day -->
+      <div class="rs-card" style="padding: 0; margin-bottom: 18px;">
+        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">Daily cash balance</div>
+        <div v-if="!data.expenses.byDay.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No activity in this period.</div>
+        <div v-else class="rs-table-scroll">
+          <div style="min-width: 860px;">
+            <div style="display:grid; grid-template-columns: 1.1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.9fr; gap: 8px; padding: 10px 18px; font-size: 11px; color: #5d6470; border-bottom: 1px solid #1c2026;">
+              <span>Date</span><span style="text-align:right;">Sales</span><span style="text-align:right;">E-payments</span><span style="text-align:right;">Cash sales</span><span style="text-align:right;">Cash expenses</span><span style="text-align:right;">Expected cash</span><span style="text-align:right;">Counted</span><span style="text-align:right;">Difference</span><span style="text-align:right;">Status</span>
+            </div>
+            <div v-for="d in data.expenses.byDay" :key="d.date" style="display:grid; grid-template-columns: 1.1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.9fr; gap: 8px; padding: 10px 18px; border-bottom: 1px solid #1c2026; font-size: 12.5px; font-variant-numeric: tabular-nums;">
+              <span style="font-weight: 600;">{{ d.date }}</span>
+              <span style="text-align:right; color:#aab0bb;">{{ peso2(d.sales) }}</span>
+              <span style="text-align:right; color:#aab0bb;">{{ peso2(d.epay) }}</span>
+              <span style="text-align:right;">{{ peso2(d.cashSales) }}</span>
+              <span style="text-align:right;" :style="{ color: d.expensesCash ? '#e88' : '#5d6470' }">
+                {{ d.expensesCash ? "−" + peso2(d.expensesCash) : "—" }}
+                <span v-if="d.expensesOther" style="display:block; font-size: 10.5px; color:#5d6470;">+{{ peso2(d.expensesOther) }} not from drawer</span>
+              </span>
+              <span style="text-align:right; font-weight: 700;">{{ peso2(d.expectedCash) }}</span>
+              <span style="text-align:right; color:#5bb8f5;">{{ d.counts ? peso2(d.counted) : "—" }}</span>
+              <span style="text-align:right;" :style="{ color: balanceStatus(d).color }">{{ d.counts ? signedPeso(d.difference) : "—" }}</span>
+              <span style="text-align:right; font-weight:600; font-size: 11.5px;" :style="{ color: balanceStatus(d).color }">{{ balanceStatus(d).text }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Records -->
+      <div class="rs-card" style="padding: 0; margin-bottom: 18px;">
+        <div style="padding: 14px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026;">Expense records</div>
+        <div v-if="!data.expenses.records.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No expenses logged in this period.</div>
+        <div v-for="x in data.expenses.records" :key="x.id" style="display:flex; gap: 10px; align-items:flex-start; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+          <span :style="{ width: '8px', height: '8px', borderRadius: '50%', background: categoryColor(x.category), display: 'inline-block', marginTop: '6px', flexShrink: 0 }"></span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size: 13px; font-weight: 600; word-break: break-word;">{{ x.description }} <span style="font-weight:400; color:#aab0bb;">· {{ x.categoryLabel }}</span></div>
+            <div style="font-size: 11.5px; color:#7a8190; word-break: break-word;">
+              <span v-if="x.paidTo">{{ x.paidTo }} · </span><span v-if="x.receiptNo">OR {{ x.receiptNo }} · </span>{{ x.businessDate }} {{ gymTime(x.datetime) }} · {{ x.recordedBy }}
+            </div>
+            <div style="font-size: 11px;" :style="{ color: x.paidFrom === 'cash' ? '#aab0bb' : '#5d6470' }">{{ x.paidFrom === "cash" ? "From cash on hand" : "Not from drawer" }}</div>
+            <div v-if="x.voidStatus === 'pending'" style="font-size: 11.5px; color:#f3c44b;">Void requested by {{ x.voidRequestedBy }} — {{ x.voidReason }}</div>
+          </div>
+          <span style="font-weight: 800; font-size: 13.5px; font-variant-numeric: tabular-nums;">{{ peso2(x.amount) }}</span>
+        </div>
+      </div>
+
+      <!-- Voided expenses -->
+      <div class="rs-card" style="padding: 0;">
+        <div style="padding: 12px 18px; font-weight: 700; font-size: 13.5px; border-bottom: 1px solid #1c2026; color: #e88;">Voided expenses</div>
+        <div v-if="!data.expenses.voided.length" style="padding: 24px; text-align: center; color: #5d6470; font-size: 13px;">No voided expenses in this period.</div>
+        <div v-for="x in data.expenses.voided" :key="x.id" style="display:flex; gap: 10px; align-items:flex-start; padding: 10px 18px; border-bottom: 1px solid #1c2026;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size: 13px; font-weight: 600;">{{ x.description }} <span style="font-weight: 400; color:#7a8190; font-size: 11.5px;">· {{ x.categoryLabel }} · {{ x.businessDate }}</span></div>
+            <div v-if="x.voidReason" style="font-size: 11.5px; color: #7a8190;">Reason: {{ x.voidReason }}</div>
+            <div style="font-size: 11px; color: #5d6470;">Approved by {{ x.voidReviewedBy || "super admin" }} · {{ gymDateTime(x.voidReviewedAt) }}</div>
+          </div>
+          <span style="font-size: 12.5px; color: #e88; text-decoration: line-through; font-variant-numeric: tabular-nums;">{{ peso2(x.amount) }}</span>
         </div>
       </div>
     </template>
@@ -1003,6 +1203,8 @@ function kindLabel(kind) {
 </template>
 
 <style scoped>
+.rs-bal-row { display: flex; justify-content: space-between; gap: 10px; color: #aab0bb; padding: 4px 0; }
+.rs-bal-sub { border-top: 1px solid #1f242c; margin: 2px 0; padding-top: 8px; color: #e6e8eb; font-weight: 700; }
 @media (max-width: 768px) {
   /* Summary bar: 2 cols on mobile */
   [style*="--rs-cols: 5"] {

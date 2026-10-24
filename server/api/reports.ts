@@ -3,7 +3,9 @@ import Receipt from "../utils/models/Receipt";
 import Settings from "../utils/models/Settings";
 import Remittance from "../utils/models/Remittance";
 import EPayment from "../utils/models/EPayment";
+import Expense from "../utils/models/Expense";
 import { EPAY_PROVIDERS } from "../../utils/epay";
+import { EXPENSE_CATEGORIES, cashBalance } from "../../utils/expense";
 import { PESO_DENOMINATIONS } from "../../utils/peso";
 import { connectDB } from "../utils/db";
 import { requireRole } from "../utils/auth";
@@ -74,7 +76,7 @@ export default defineEventHandler(async (event) => {
   const startDay = dayKey(start, utcOffset);
   const endDay = dayKey(end, utcOffset);
 
-  const [checkins, receipts, voidedCheckins, voidedReceipts, remittances, epayments] = await Promise.all([
+  const [checkins, receipts, voidedCheckins, voidedReceipts, remittances, epayments, expenseDocs] = await Promise.all([
     CheckIn.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
     Receipt.find({ createdAt: { $gte: start, $lte: end }, voided: { $ne: true } }).lean(),
     CheckIn.find({ createdAt: { $gte: start, $lte: end }, voided: true }).lean(),
@@ -85,6 +87,11 @@ export default defineEventHandler(async (event) => {
       .sort({ createdAt: -1 })
       .lean(),
     EPayment.find({ businessDate: { $gte: startDay, $lte: endDay } })
+      .populate("voidRequestedBy", "name")
+      .populate("voidReviewedBy", "name")
+      .sort({ createdAt: -1 })
+      .lean(),
+    Expense.find({ businessDate: { $gte: startDay, $lte: endDay } })
       .populate("voidRequestedBy", "name")
       .populate("voidReviewedBy", "name")
       .sort({ createdAt: -1 })
@@ -283,11 +290,27 @@ export default defineEventHandler(async (event) => {
     epayByProvider[p.provider].amount += p.amount;
   }
 
-  const allDays = Array.from(new Set([...Object.keys(salesByDay), ...Object.keys(remitByDay), ...Object.keys(epayByDay)])).sort().reverse();
+  // Expenses: only those paid from the drawer ("cash") reduce the cash expected on hand.
+  const activeExpenses = expenseDocs.filter((x: any) => !x.voided);
+  const voidedExpenses = expenseDocs.filter((x: any) => x.voided);
+  const expByDay: Record<string, { cash: number; other: number; count: number }> = {};
+  const expByCategory: Record<string, { count: number; amount: number }> = {};
+  for (const x of activeExpenses as any[]) {
+    if (!expByDay[x.businessDate]) expByDay[x.businessDate] = { cash: 0, other: 0, count: 0 };
+    expByDay[x.businessDate][x.paidFrom === "other" ? "other" : "cash"] += x.amount;
+    expByDay[x.businessDate].count += 1;
+    if (!expByCategory[x.category]) expByCategory[x.category] = { count: 0, amount: 0 };
+    expByCategory[x.category].count += 1;
+    expByCategory[x.category].amount += x.amount;
+  }
+
+  const allDays = Array.from(new Set([...Object.keys(salesByDay), ...Object.keys(remitByDay), ...Object.keys(epayByDay), ...Object.keys(expByDay)])).sort().reverse();
   const remitTotal = round2(activeRemits.reduce((s: number, r: any) => s + r.totalCash, 0));
   const epayTotal = round2(activeEpays.reduce((s: number, p: any) => s + p.amount, 0));
   const collectedTotal = round2(remitTotal + epayTotal);
   const salesTotal = round2(receipts.reduce((s, r) => s + r.total, 0));
+  const expCashTotal = round2(activeExpenses.filter((x: any) => x.paidFrom !== "other").reduce((s: number, x: any) => s + x.amount, 0));
+  const expOtherTotal = round2(activeExpenses.filter((x: any) => x.paidFrom === "other").reduce((s: number, x: any) => s + x.amount, 0));
 
   const serializeRemit = (r: any) => ({
     id: String(r._id),
@@ -330,7 +353,10 @@ export default defineEventHandler(async (event) => {
     totalEpayments: epayTotal,
     totalCollected: collectedTotal,     // cash + e-payments
     totalRecordedSales: salesTotal,
-    variance: round2(collectedTotal - salesTotal),
+    totalExpensesCash: expCashTotal,
+    // Cash paid out for expenses legitimately leaves the drawer, so it's added back:
+    // difference = cash counted + e-payments + cash expenses − recorded sales
+    variance: cashBalance(salesTotal, epayTotal, expCashTotal, remitTotal).difference,
     count: activeRemits.length,
     epaymentCount: activeEpays.length,
     daysRemitted: Object.keys(remitByDay).length,
@@ -344,9 +370,10 @@ export default defineEventHandler(async (event) => {
       const epay = round2(epayByDay[date]?.amount || 0);
       const collected = round2(remitted + epay);
       const sales = round2(salesByDay[date] || 0);
+      const expenses = round2(expByDay[date]?.cash || 0);
       return {
-        date, remitted, epay, collected, sales,
-        variance: round2(collected - sales),
+        date, remitted, epay, collected, sales, expenses,
+        variance: cashBalance(sales, epay, expenses, remitted).difference,
         count: remitByDay[date]?.count || 0,
         epayCount: epayByDay[date]?.count || 0,
       };
@@ -369,9 +396,70 @@ export default defineEventHandler(async (event) => {
     voided: voidedRemits.map(serializeRemit),
   };
 
+  const serializeExp = (x: any) => ({
+    id: String(x._id),
+    businessDate: x.businessDate,
+    category: x.category,
+    categoryLabel: x.categoryLabel,
+    amount: x.amount,
+    description: x.description || "",
+    paidTo: x.paidTo || "",
+    receiptNo: x.receiptNo || "",
+    paidFrom: x.paidFrom || "cash",
+    recordedBy: x.recordedByName || "Unknown",
+    datetime: x.createdAt,
+    voidStatus: x.voidStatus || "none",
+    voidReason: x.voidReason || null,
+    voidRequestedBy: x.voidRequestedBy?.name || null,
+    voidReviewedBy: x.voidReviewedBy?.name || null,
+    voidReviewedAt: x.voidReviewedAt || null,
+  });
+
+  // --- Expenses & cash on hand balance ---
+  const periodBalance = cashBalance(salesTotal, epayTotal, expCashTotal, remitTotal);
+  const expenses = {
+    total: round2(expCashTotal + expOtherTotal),
+    totalCash: expCashTotal,     // paid from the drawer
+    totalOther: expOtherTotal,   // paid outside the drawer
+    count: activeExpenses.length,
+    pendingVoids: activeExpenses.filter((x: any) => x.voidStatus === "pending").length,
+    balance: {
+      sales: salesTotal,
+      epayments: epayTotal,
+      cashSales: periodBalance.cashSales,
+      expensesCash: expCashTotal,
+      expectedCash: periodBalance.expectedCash,
+      counted: remitTotal,
+      difference: periodBalance.difference,
+      // Days where money moved (sales or cash expenses) but nobody counted the drawer
+      daysNotCounted: allDays.filter((d) => !remitByDay[d] && (salesByDay[d] || expByDay[d]?.cash)).length,
+    },
+    byDay: allDays.map((date) => {
+      const sales = round2(salesByDay[date] || 0);
+      const epay = round2(epayByDay[date]?.amount || 0);
+      const expensesCash = round2(expByDay[date]?.cash || 0);
+      const expensesOther = round2(expByDay[date]?.other || 0);
+      const counted = round2(remitByDay[date]?.remitted || 0);
+      const b = cashBalance(sales, epay, expensesCash, counted);
+      return {
+        date, sales, epay, cashSales: b.cashSales, expensesCash, expensesOther,
+        expenseCount: expByDay[date]?.count || 0,
+        expectedCash: b.expectedCash, counted, difference: b.difference,
+        counts: remitByDay[date]?.count || 0,
+      };
+    }),
+    byCategory: EXPENSE_CATEGORIES
+      .filter((c) => expByCategory[c.key])
+      .map((c) => ({ key: c.key, label: c.label, count: expByCategory[c.key].count, amount: round2(expByCategory[c.key].amount) }))
+      .sort((a, b) => b.amount - a.amount),
+    records: activeExpenses.map(serializeExp),
+    voided: voidedExpenses.map(serializeExp),
+  };
+
   return {
     period,
     remittance,
+    expenses,
     range: { start, end },
     gymGoers,
     checkinList,

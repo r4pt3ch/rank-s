@@ -1,5 +1,6 @@
 import Remittance from "../../utils/models/Remittance";
 import EPayment from "../../utils/models/EPayment";
+import Expense from "../../utils/models/Expense";
 import { connectDB } from "../../utils/db";
 import { requireRole } from "../../utils/auth";
 import { logAudit } from "../../utils/helpers";
@@ -18,7 +19,7 @@ export default defineEventHandler(async (event) => {
     const utcOffset = await getUtcOffset();
     const today = gymDayKey(new Date(), utcOffset);
 
-    const [sales, todayAgg, epayAgg, recent] = await Promise.all([
+    const [sales, todayAgg, epayAgg, expenseAgg, recent] = await Promise.all([
       todaysRecordedSales(utcOffset),
       Remittance.aggregate([
         { $match: { businessDate: today, voided: { $ne: true } } },
@@ -27,6 +28,10 @@ export default defineEventHandler(async (event) => {
       EPayment.aggregate([
         { $match: { businessDate: today, voided: { $ne: true } } },
         { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
+      ]),
+      Expense.aggregate([
+        { $match: { businessDate: today, voided: { $ne: true } } },
+        { $group: { _id: "$paidFrom", total: { $sum: "$amount" }, count: { $sum: 1 } } },
       ]),
       Remittance.find()
         .sort({ createdAt: -1 })
@@ -45,6 +50,10 @@ export default defineEventHandler(async (event) => {
       todayRemitted: Math.round(todayRemitted * 100) / 100,
       todayEpayments: Math.round((epayAgg[0]?.total || 0) * 100) / 100,
       todayEpaymentsCount: epayAgg[0]?.count || 0,
+      // Expenses paid out of the drawer reduce the cash staff are expected to have on hand.
+      todayExpensesCash: Math.round((expenseAgg.find((g: any) => g._id !== "other")?.total || 0) * 100) / 100,
+      todayExpensesOther: Math.round((expenseAgg.find((g: any) => g._id === "other")?.total || 0) * 100) / 100,
+      todayExpensesCount: expenseAgg.reduce((n: number, g: any) => n + g.count, 0),
       records: recent.map(serializeRemittance),
     };
   }
